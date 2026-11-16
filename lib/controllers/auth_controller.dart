@@ -3,8 +3,9 @@ import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../core/constants/api_constants.dart';
 
-const String API_URL = 'http://localhost:3000'; // Change to your backend URL
+String get API_URL => ApiConstants.baseUrl;
 
 class AuthController extends GetxController {
   var isLoading = false.obs;

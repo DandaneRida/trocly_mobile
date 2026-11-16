@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../core/constants/api_constants.dart';
 
-const String apiUrl = 'http://localhost:3000';
+String get apiUrl => ApiConstants.baseUrl;
 
 // Report Controller
 class ReportController extends GetxController {

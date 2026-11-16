@@ -3,9 +3,34 @@ import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:web_socket_channel/web_socket_channel.dart';
+import '../core/constants/api_constants.dart';
 
-const String API_URL = 'http://localhost:3000';
-const String WS_URL = 'ws://localhost:3000';
+String get API_URL => ApiConstants.baseUrl;
+String get WS_URL => ApiConstants.wsUrl;
+
+// Conversation summary model (used by MessagesInboxScreen)
+class ConversationModel {
+  final String offerId;
+  final String otherUserName;
+  final String lastMessage;
+  final String offerStatus;
+
+  ConversationModel({
+    required this.offerId,
+    required this.otherUserName,
+    required this.lastMessage,
+    required this.offerStatus,
+  });
+
+  factory ConversationModel.fromJson(Map<String, dynamic> json) {
+    return ConversationModel(
+      offerId: json['offerId'] ?? json['id'] ?? '',
+      otherUserName: json['otherUser']?['displayName'] ?? 'Utilisateur',
+      lastMessage: json['lastMessage'] ?? '',
+      offerStatus: json['status'] ?? 'pending',
+    );
+  }
+}
 
 // Models
 class ChatMessage {
@@ -25,6 +50,12 @@ class ChatMessage {
     required this.isOwn,
   });
 
+  /// Alias used by chat_screen.dart
+  bool get isMe => isOwn;
+
+  /// Formatted time string used by chat_screen.dart
+  String get timestampStr => '${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}';
+
   factory ChatMessage.fromJson(Map<String, dynamic> json, String currentUserId) {
     return ChatMessage(
       id: json['id'],
@@ -39,14 +70,72 @@ class ChatMessage {
 
 class ChatController extends GetxController {
   var messages = <ChatMessage>[].obs;
+  var conversations = <ConversationModel>[].obs;
   var isLoading = false.obs;
   var isConnected = false.obs;
   var typingUsers = <String>[].obs;
   var unreadCount = 0.obs;
   var errorMessage = ''.obs;
 
+  WebSocketChannel? _channel;
   late WebSocketChannel channel;
   final client = http.Client();
+
+  /// Fetch all conversations (used by MessagesInboxScreen)
+  Future<void> fetchConversations() async {
+    isLoading.value = true;
+    try {
+      final response = await client.get(
+        Uri.parse('$API_URL/offers/conversations'),
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as List;
+        conversations.value = data.map((c) => ConversationModel.fromJson(c)).toList();
+      }
+    } catch (e) {
+      // silently fail — empty list shown
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  /// Load messages for one offer (REST)
+  Future<void> loadMessages(String offerId) async {
+    await fetchChatHistory(offerId);
+  }
+
+  /// Connect WebSocket for one offer (simple alias)
+  Future<void> connectWebSocket(String offerId) async {
+    try {
+      _channel = WebSocketChannel.connect(Uri.parse('$WS_URL/socket.io/?transport=websocket'));
+      channel = _channel!;
+      isConnected.value = true;
+
+      channel.sink.add(jsonEncode({
+        'event': 'join-offer',
+        'data': {'offerId': offerId},
+      }));
+
+      channel.stream.listen((dynamic msg) {
+        final data = jsonDecode(msg);
+        _handleWebSocketMessage(data, '');
+      }, onDone: () {
+        isConnected.value = false;
+      }, onError: (_) {
+        isConnected.value = false;
+      });
+    } catch (e) {
+      isConnected.value = false;
+    }
+  }
+
+  /// Disconnect WebSocket
+  void disconnectWebSocket() {
+    try {
+      _channel?.sink.close();
+    } catch (_) {}
+    isConnected.value = false;
+  }
 
   /**
    * Connect to WebSocket and join offer chat room
@@ -87,11 +176,11 @@ class ChatController extends GetxController {
   }
 
   /**
-   * Send a message via WebSocket
+   * Send a message via WebSocket (2-arg variant used by chat_screen.dart)
    */
-  Future<void> sendMessage(String offerId, String userId, String content) async {
+  Future<void> sendMessage(String offerId, String content, [String? userId]) async {
     if (!isConnected.value) {
-      Get.snackbar('Error', 'Not connected to chat');
+      Get.snackbar('Erreur', 'Non connecté au chat');
       return;
     }
 
@@ -99,13 +188,13 @@ class ChatController extends GetxController {
       channel.sink.add(jsonEncode({
         'event': 'send-message',
         'data': {
-          'userId': userId,
+          'userId': userId ?? '',
           'offerId': offerId,
           'content': content,
         },
       }));
     } catch (e) {
-      Get.snackbar('Error', 'Failed to send message');
+      Get.snackbar('Erreur', 'Impossible d\'envoyer le message');
     }
   }
 

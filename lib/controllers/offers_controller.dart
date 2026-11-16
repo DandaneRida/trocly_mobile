@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../core/constants/api_constants.dart';
 
-const String API_URL = 'http://localhost:3000';
+String get API_URL => ApiConstants.baseUrl;
 
 // Models
 class OfferItemModel {
@@ -159,41 +160,43 @@ class OffersController extends GetxController {
     }
   }
 
-  Future<void> acceptOffer(String offerId, String userId) async {
+  Future<void> acceptOffer(String offerId, [String? userId]) async {
     isLoading.value = true;
     try {
+      final uid = userId ?? '';
       final response = await client.patch(
-        Uri.parse('$API_URL/offers/$offerId/accept?userId=$userId'),
+        Uri.parse('$API_URL/offers/$offerId/accept?userId=$uid'),
       );
 
       if (response.statusCode == 200) {
-        Get.snackbar('Success', 'Offer accepted!');
-        await fetchReceivedOffers(userId);
+        Get.snackbar('Succès', 'Offre acceptée !');
+        if (uid.isNotEmpty) await fetchReceivedOffers(uid);
       } else {
-        Get.snackbar('Error', 'Failed to accept offer');
+        Get.snackbar('Erreur', 'Impossible d\'accepter l\'offre');
       }
     } catch (e) {
-      Get.snackbar('Error', 'Network error: $e');
+      Get.snackbar('Erreur', 'Erreur réseau : $e');
     } finally {
       isLoading.value = false;
     }
   }
 
-  Future<void> rejectOffer(String offerId, String userId) async {
+  Future<void> rejectOffer(String offerId, [String? userId]) async {
     isLoading.value = true;
     try {
+      final uid = userId ?? '';
       final response = await client.patch(
-        Uri.parse('$API_URL/offers/$offerId/reject?userId=$userId'),
+        Uri.parse('$API_URL/offers/$offerId/reject?userId=$uid'),
       );
 
       if (response.statusCode == 200) {
-        Get.snackbar('Success', 'Offer rejected');
-        await fetchReceivedOffers(userId);
+        Get.snackbar('Info', 'Offre refusée');
+        if (uid.isNotEmpty) await fetchReceivedOffers(uid);
       } else {
-        Get.snackbar('Error', 'Failed to reject offer');
+        Get.snackbar('Erreur', 'Impossible de refuser l\'offre');
       }
     } catch (e) {
-      Get.snackbar('Error', 'Network error: $e');
+      Get.snackbar('Erreur', 'Erreur réseau : $e');
     } finally {
       isLoading.value = false;
     }

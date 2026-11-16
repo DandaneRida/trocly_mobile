@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
+import 'package:get/get.dart' hide MultipartFile;
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:http/http.dart';
 import 'dart:convert';
+import '../core/constants/api_constants.dart';
 
-const String apiUrl = 'http://localhost:3000';
+String get apiUrl => ApiConstants.baseUrl;
 
 /// Image model for preview
 class ImagePreview {

@@ -9,6 +9,46 @@ class MeetingController extends GetxController {
   var scanResult = ''.obs;
   var validationSuccess = false.obs;
 
+  var qrCodeData = ''.obs;
+
+  Future<void> generatePersonalQR(String meetingId) async {
+    this.meetingId.value = meetingId;
+    qrCodeData.value = 'trocly:meeting:$meetingId:nonce:${DateTime.now().millisecondsSinceEpoch}';
+  }
+
+  Future<void> proposeMeeting({
+    required String offerId,
+    required String place,
+    required String timeSlot,
+  }) async {
+    isLoading.value = true;
+    try {
+      // TODO: POST /meetings { offerId, place, scheduledAt: timeSlot }
+      Get.snackbar('Succès', 'Rendez-vous proposé !');
+      Get.back();
+    } catch (e) {
+      Get.snackbar('Erreur', 'Impossible de proposer le rendez-vous');
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<void> validateQRScan({
+    required String meetingId,
+    required String scannedData,
+  }) async {
+    isLoading.value = true;
+    try {
+      // TODO: POST /meetings/qr/scan { meetingId, scannedData }
+      validationSuccess.value = true;
+      Get.snackbar('Succès', 'QR scanné avec succès !');
+    } catch (e) {
+      Get.snackbar('Erreur', 'Échec du scan QR');
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
   /// SINGLE-SCAN: One QR scan validates the entire meeting
   Future<void> scanAndValidateQR(String payload, String userId) async {
     isLoading.value = true;

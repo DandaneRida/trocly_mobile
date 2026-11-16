@@ -3,8 +3,9 @@ import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'offers_controller.dart'; // Import MakeOfferScreen
+import '../core/constants/api_constants.dart';
 
-const String apiUrl = 'http://localhost:3000';
+String get apiUrl => ApiConstants.baseUrl;
 
 // Model
 class ListingModel {
@@ -196,6 +197,53 @@ class ListingsController extends GetxController {
     } finally {
       isLoading.value = false;
     }
+  }
+
+  void filterByCity(String city) => changeCity(city);
+
+  Future<void> searchListings(String keyword) async {
+    isLoading.value = true;
+    try {
+      final response = await client.get(Uri.parse('$apiUrl/listings?search=$keyword'));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final list = (data['listings'] as List?) ?? [];
+        listings.value = list.map((l) => ListingModel.fromJson(l)).toList();
+      }
+    } catch (_) {
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<void> publishListingEnhanced({
+    required String title,
+    required String description,
+    required String category,
+    required String condition,
+    required double estimatedValue,
+    required String city,
+    required List<String> photos,
+    required Map<String, dynamic> attributes,
+    required List<String> wishes,
+  }) async {
+    final cityMap = {
+      'Meknès': 1,
+      'Fès': 2,
+      'Rabat': 3,
+      'Casablanca': 4,
+      'Marrakech': 5,
+    };
+    await createListing(
+      'current-user',
+      title: title,
+      description: description,
+      category: category,
+      condition: condition,
+      estimatedValue: estimatedValue,
+      cityId: cityMap[city] ?? 1,
+      photos: photos,
+    );
   }
 }
 

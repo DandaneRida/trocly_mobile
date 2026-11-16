@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../core/constants/api_constants.dart';
 
-const String API_URL = 'http://localhost:3000';
+String get API_URL => ApiConstants.baseUrl;
 
 // Models
 class ReviewModel {
@@ -61,6 +62,20 @@ class ReviewsController extends GetxController {
   var errorMessage = ''.obs;
 
   final client = http.Client();
+
+  // Alias used by review_screen.dart
+  Future<void> submitReview({
+    required String meetingId,
+    required int rating,
+    required String comment,
+  }) async {
+    await postReview(
+      meetingId: meetingId,
+      reviewerId: '', // AuthController would supply this
+      rating: rating,
+      comment: comment,
+    );
+  }
 
   // D5 - Post review after meeting validation
   Future<void> postReview({
