@@ -68,25 +68,32 @@ class _FeedScreenState extends State<FeedScreen> {
                     child: Center(child: CircularProgressIndicator()),
                   )
                 else
-                  ...cities.map((city) {
-                    final isSelected = city.name == _listingsController.selectedCity.value;
-                    return ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(
-                        city.name,
-                        style: TextStyle(
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                          color: isSelected ? AppColors.primary : AppColors.textPrimary,
-                        ),
-                      ),
-                      trailing: isSelected ? const Icon(Icons.check, color: AppColors.primary) : null,
-                      onTap: () {
-                        _authController.selectedCity.value = city.name;
-                        _listingsController.changeCity(city.name);
-                        Navigator.pop(ctx);
+                  Flexible(
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: cities.length,
+                      itemBuilder: (context, idx) {
+                        final city = cities[idx];
+                        final isSelected = city.name == _listingsController.selectedCity.value;
+                        return ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(
+                            city.name,
+                            style: TextStyle(
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              color: isSelected ? AppColors.primary : AppColors.textPrimary,
+                            ),
+                          ),
+                          trailing: isSelected ? const Icon(Icons.check, color: AppColors.primary) : null,
+                          onTap: () {
+                            _authController.selectedCity.value = city.name;
+                            _listingsController.changeCity(city.name);
+                            Navigator.pop(ctx);
+                          },
+                        );
                       },
-                    );
-                  }).toList(),
+                    ),
+                  ),
               ],
             ),
           );
