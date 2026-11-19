@@ -21,6 +21,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
 
   int _step = 1;
   final int _totalSteps = 6;
+  bool _isPublishing = false;
 
   // Photos
   final List<String> _uploadedPhotoUrls = [];
@@ -146,6 +147,8 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
   }
 
   void _publish() async {
+    if (_isPublishing) return;
+
     final token = _authController.authToken.value;
     if (token.isEmpty) {
       Get.snackbar(
@@ -158,21 +161,33 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
       return;
     }
 
-    final success = await _listingsController.publishListingEnhanced(
-      title: _titleController.text.trim(),
-      description: _descController.text.trim(),
-      category: _selectedCategory,
-      condition: _selectedCondition,
-      estimatedValue: 0.0,
-      city: _selectedCity,
-      photos: _uploadedPhotoUrls,
-      attributes: _attributes,
-      wishes: _wishController.text.trim().isNotEmpty
-          ? [_wishController.text.trim()]
-          : ['Échange ouvert'],
-    );
-    if (success) {
-      Get.back(result: true);
+    setState(() => _isPublishing = true);
+
+    try {
+      final success = await _listingsController.publishListingEnhanced(
+        title: _titleController.text.trim(),
+        description: _descController.text.trim(),
+        category: _selectedCategory,
+        condition: _selectedCondition,
+        estimatedValue: 0.0,
+        city: _selectedCity,
+        photos: _uploadedPhotoUrls,
+        attributes: _attributes,
+        wishes: _wishController.text.trim().isNotEmpty
+            ? [_wishController.text.trim()]
+            : ['Échange ouvert'],
+      );
+      if (success) {
+        if (Navigator.of(context).canPop()) {
+          Get.back(result: true);
+        } else {
+          Get.offAllNamed('/feed');
+        }
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isPublishing = false);
+      }
     }
   }
 
@@ -230,7 +245,8 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                     flex: 2,
                     child: PrimaryButton(
                       label: _step == _totalSteps ? 'Publier l\'annonce' : 'Continuer',
-                      onPressed: _nextStep,
+                      isLoading: _isPublishing,
+                      onPressed: _isPublishing ? null : _nextStep,
                     ),
                   ),
                 ],
