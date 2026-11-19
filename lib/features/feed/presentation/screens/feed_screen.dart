@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../../controllers/auth_controller.dart';
 import '../../../../controllers/listings_controller.dart';
+import '../../../../controllers/notifications_controller.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/listing_card.dart';
@@ -18,6 +19,7 @@ class FeedScreen extends StatefulWidget {
 class _FeedScreenState extends State<FeedScreen> {
   final ListingsController _listingsController = Get.find<ListingsController>();
   final AuthController _authController = Get.find<AuthController>();
+  final NotificationsController _notifController = Get.find<NotificationsController>();
 
   int _selectedCategoryIndex = 0;
   final List<String> _categories = const [
@@ -37,6 +39,7 @@ class _FeedScreenState extends State<FeedScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _listingsController.fetchCities();
       _listingsController.fetchListings();
+      _notifController.fetchUnreadCount();
     });
   }
 
@@ -165,25 +168,30 @@ class _FeedScreenState extends State<FeedScreen> {
                                 ),
                               );
                             }
+                            final unreadNotifs = _notifController.unreadCount.value;
                             return IconButton(
-                              onPressed: () => Get.toNamed('/notifications'),
+                              onPressed: () async {
+                                await Get.toNamed('/notifications');
+                                _notifController.fetchUnreadCount();
+                              },
                               icon: Stack(
                                 clipBehavior: Clip.none,
                                 children: [
                                   const Icon(Icons.notifications_none_rounded, size: 23, color: AppColors.ink),
-                                  Positioned(
-                                    top: 1,
-                                    right: 1,
-                                    child: Container(
-                                      width: 8,
-                                      height: 8,
-                                      decoration: BoxDecoration(
-                                        color: AppColors.accent,
-                                        shape: BoxShape.circle,
-                                        border: Border.all(color: AppColors.paper, width: 1.5),
+                                  if (unreadNotifs > 0)
+                                    Positioned(
+                                      top: 1,
+                                      right: 1,
+                                      child: Container(
+                                        width: 8,
+                                        height: 8,
+                                        decoration: BoxDecoration(
+                                          color: AppColors.accent,
+                                          shape: BoxShape.circle,
+                                          border: Border.all(color: AppColors.paper, width: 1.5),
+                                        ),
                                       ),
                                     ),
-                                  ),
                                 ],
                               ),
                             );
