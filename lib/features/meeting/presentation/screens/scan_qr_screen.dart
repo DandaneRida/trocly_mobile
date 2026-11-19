@@ -1,8 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../../../controllers/meeting_controller.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/primary_button.dart';
 
 class ScanQrScreen extends StatefulWidget {
   const ScanQrScreen({Key? key}) : super(key: key);
@@ -13,7 +16,8 @@ class ScanQrScreen extends StatefulWidget {
 
 class _ScanQrScreenState extends State<ScanQrScreen> {
   final MeetingController _meetingController = Get.find<MeetingController>();
-  final MobileScannerController _cameraController = MobileScannerController();
+  MobileScannerController? _cameraController;
+  final _manualController = TextEditingController();
 
   String? _meetingId;
   bool _isProcessing = false;
@@ -22,87 +26,191 @@ class _ScanQrScreenState extends State<ScanQrScreen> {
   void initState() {
     super.initState();
     _meetingId = Get.parameters['meetingId'];
+    if (!kIsWeb) {
+      _cameraController = MobileScannerController();
+    }
   }
 
   @override
   void dispose() {
-    _cameraController.dispose();
+    _cameraController?.dispose();
+    _manualController.dispose();
     super.dispose();
   }
 
-  void _onDetect(BarcodeCapture capture) {
-    if (_isProcessing) return;
-    final List<Barcode> barcodes = capture.barcodes;
-    for (final barcode in barcodes) {
-      final code = barcode.rawValue;
-      if (code != null && code.isNotEmpty) {
-        setState(() => _isProcessing = true);
-        _cameraController.stop();
+  Future<void> _handlePayload(String code) async {
+    if (_isProcessing || code.trim().isEmpty) return;
+    setState(() => _isProcessing = true);
+    _cameraController?.stop();
 
-        _meetingController.validateQRScan(
-          meetingId: _meetingId ?? '',
-          scannedData: code,
-        );
-        // Navigate to review / confirm screen
-        Get.offNamed('/review/$_meetingId');
-        break;
+    final meeting = await _meetingController.validateQRScan(scannedData: code);
+    if (!mounted) return;
+
+    if (meeting != null) {
+      if (meeting.status == 'validated' || meeting.status == 'completed') {
+        Get.offNamed('/review/${meeting.id}', arguments: meeting);
+      } else {
+        Get.back(result: true);
       }
+    } else {
+      setState(() => _isProcessing = false);
+      _cameraController?.start();
     }
+  }
+
+  void _showManualInput() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.paper,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          16,
+          20,
+          MediaQuery.of(ctx).viewInsets.bottom + 24,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Saisir le code QR manuellement', style: AppTypography.serif(size: 21)),
+            const SizedBox(height: 6),
+            Text(
+              'Utile sur navigateur ou si la caméra est indisponible. Collez le code affiché sur le téléphone du partenaire.',
+              style: AppTypography.sans(size: 12.5, color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _manualController,
+              decoration: const InputDecoration(hintText: 'Coller le payload QR signé…'),
+            ),
+            const SizedBox(height: 16),
+            PrimaryButton(
+              label: 'Valider le scan',
+              isLoading: _isProcessing,
+              onPressed: () {
+                Navigator.pop(ctx);
+                _handlePayload(_manualController.text);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: AppColors.ink,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: const Text('Scanner le QR du partenaire'),
+        foregroundColor: Colors.white,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: const Icon(Icons.close_rounded, color: Colors.white),
           onPressed: () => Get.back(),
         ),
+        title: Text(
+          'Scanner son QR',
+          style: AppTypography.sans(size: 15.5, weight: FontWeight.w600, color: Colors.white),
+        ),
+        centerTitle: true,
         actions: [
+          if (_cameraController != null)
+            IconButton(
+              icon: const Icon(Icons.flash_on_rounded, color: Colors.white),
+              onPressed: () => _cameraController?.toggleTorch(),
+            ),
           IconButton(
-            icon: const Icon(Icons.flash_on, color: Colors.white),
-            onPressed: () => _cameraController.toggleTorch(),
+            icon: const Icon(Icons.keyboard_outlined, color: Colors.white),
+            tooltip: 'Saisie manuelle',
+            onPressed: _showManualInput,
           ),
         ],
       ),
       body: Stack(
         children: [
-          MobileScanner(
-            controller: _cameraController,
-            onDetect: _onDetect,
-          ),
-          // Viewfinder overlay
-          Center(
-            child: Container(
-              width: 250,
-              height: 250,
-              decoration: BoxDecoration(
-                border: Border.all(color: AppColors.accent, width: 3),
-                borderRadius: BorderRadius.circular(20),
+          if (_cameraController != null)
+            MobileScanner(
+              controller: _cameraController!,
+              onDetect: (capture) {
+                for (final barcode in capture.barcodes) {
+                  if (barcode.rawValue != null) {
+                    _handlePayload(barcode.rawValue!);
+                    break;
+                  }
+                }
+              },
+            )
+          else
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(28),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.qr_code_scanner_rounded, size: 52, color: Colors.white70),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Scanner caméra disponible sur mobile',
+                      textAlign: TextAlign.center,
+                      style: AppTypography.serif(size: 22, color: Colors.white),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Sur navigateur web, utilisez la saisie manuelle du payload QR pour tester le double scan.',
+                      textAlign: TextAlign.center,
+                      style: AppTypography.sans(size: 13, color: Colors.white70),
+                    ),
+                    const SizedBox(height: 22),
+                    PrimaryButton(
+                      label: 'Coller le code QR du partenaire',
+                      backgroundColor: AppColors.accent,
+                      onPressed: _showManualInput,
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-          Positioned(
-            bottom: 60,
-            left: 20,
-            right: 20,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.7),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Text(
-                'Alignez le QR code du partenaire dans le cadre pour valider la rencontre.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white, fontSize: 13),
+          if (_cameraController != null)
+            Center(
+              child: Container(
+                width: 240,
+                height: 240,
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.white, width: 2),
+                  borderRadius: BorderRadius.circular(18),
+                ),
               ),
             ),
-          ),
+          if (_cameraController != null)
+            Positioned(
+              bottom: 36,
+              left: 24,
+              right: 24,
+              child: Column(
+                children: [
+                  Text(
+                    'Placez le QR code du partenaire dans le cadre',
+                    textAlign: TextAlign.center,
+                    style: AppTypography.sans(size: 13, color: Colors.white),
+                  ),
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed: _showManualInput,
+                    child: Text(
+                      'Saisir le code manuellement',
+                      style: AppTypography.sans(
+                        size: 12.5,
+                        color: Colors.white70,
+                        weight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );
