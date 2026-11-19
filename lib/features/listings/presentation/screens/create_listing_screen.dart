@@ -87,12 +87,12 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
   }
 
   void _publish() async {
-    _listingsController.publishListingEnhanced(
+    final success = await _listingsController.publishListingEnhanced(
       title: _titleController.text.trim(),
       description: _descController.text.trim(),
       category: _selectedCategory,
       condition: _selectedCondition,
-      estimatedValue: 0.0, // aucun prix stocké / symbolique
+      estimatedValue: 0.0,
       city: _selectedCity,
       photos: [],
       attributes: _attributes,
@@ -100,6 +100,9 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
           ? [_wishController.text.trim()]
           : ['Échange ouvert'],
     );
+    if (success) {
+      Get.back(result: true);
+    }
   }
 
   @override

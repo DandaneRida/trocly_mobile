@@ -2,12 +2,28 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'offers_controller.dart'; // Import MakeOfferScreen
+import 'auth_controller.dart';
+import 'offers_controller.dart';
 import '../core/constants/api_constants.dart';
 
 String get apiUrl => ApiConstants.baseUrl;
 
-// Model
+// Model City
+class CityModel {
+  final int id;
+  final String name;
+
+  CityModel({required this.id, required this.name});
+
+  factory CityModel.fromJson(Map<String, dynamic> json) {
+    return CityModel(
+      id: json['id'] is int ? json['id'] : int.parse(json['id'].toString()),
+      name: json['name'] ?? '',
+    );
+  }
+}
+
+// Model Listing
 class ListingModel {
   String id;
   String title;
@@ -16,9 +32,11 @@ class ListingModel {
   String condition;
   double estimatedValue;
   String city;
+  int? cityId;
   List<String> photos;
   String status;
   String userId;
+  String? userName;
 
   ListingModel({
     required this.id,
@@ -28,51 +46,126 @@ class ListingModel {
     required this.condition,
     required this.estimatedValue,
     required this.city,
+    this.cityId,
     required this.photos,
     required this.status,
     required this.userId,
+    this.userName,
   });
 
   factory ListingModel.fromJson(Map<String, dynamic> json) {
     return ListingModel(
-      id: json['id'],
-      title: json['title'],
+      id: json['id']?.toString() ?? '',
+      title: json['title'] ?? '',
       description: json['description'] ?? '',
-      category: json['category'],
-      condition: json['condition'],
-      estimatedValue: double.parse(json['estimatedValue'].toString()),
-      city: json['city']?['name'] ?? 'Unknown',
+      category: json['category'] ?? '',
+      condition: json['condition'] ?? '',
+      estimatedValue: json['estimatedValue'] != null
+          ? double.tryParse(json['estimatedValue'].toString()) ?? 0.0
+          : 0.0,
+      city: json['city']?['name'] ?? 'Inconnue',
+      cityId: json['city']?['id'] is int ? json['city']['id'] : null,
       photos: List<String>.from(json['photos'] ?? []),
-      status: json['status'],
-      userId: json['user']['id'],
+      status: json['status'] ?? 'active',
+      userId: json['user']?['id']?.toString() ?? '',
+      userName: json['user']?['displayName'],
     );
   }
 }
 
 class ListingsController extends GetxController {
   var listings = <ListingModel>[].obs;
+  var myListings = <ListingModel>[].obs;
   var isLoading = false.obs;
+  var isMyListingsLoading = false.obs;
+
   var selectedCity = 'Meknès'.obs;
+  var selectedCityId = Rxn<int>(1);
   var selectedCategory = ''.obs;
   var categories = <String>[].obs;
   var conditions = <String>[].obs;
+  var cities = <CityModel>[].obs;
   var errorMessage = ''.obs;
 
   final client = http.Client();
 
+  Map<String, String> _getAuthHeaders() {
+    final authController = Get.find<AuthController>();
+    final token = authController.authToken.value;
+    final headers = <String, String>{
+      'Content-Type': 'application/json',
+    };
+    if (token.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+    return headers;
+  }
+
   @override
   void onInit() {
     super.onInit();
-    fetchListings();
+    fetchCities();
     fetchCategories();
+    fetchConditions();
+    fetchListings();
   }
 
+  /// Récupération dynamique des villes (Story B5)
+  Future<void> fetchCities() async {
+    try {
+      final response = await client.get(Uri.parse('$apiUrl/cities'));
+      if (response.statusCode == 200) {
+        final List data = jsonDecode(response.body);
+        cities.value = data.map((c) => CityModel.fromJson(c)).toList();
+        if (cities.isNotEmpty) {
+          final found = cities.firstWhereOrNull((c) => c.name == selectedCity.value);
+          if (found != null) {
+            selectedCityId.value = found.id;
+          } else {
+            selectedCity.value = cities.first.name;
+            selectedCityId.value = cities.first.id;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching cities: $e');
+    }
+  }
+
+  /// Récupération des catégories
+  Future<void> fetchCategories() async {
+    try {
+      final response = await client.get(Uri.parse('$apiUrl/listings/meta/categories'));
+      if (response.statusCode == 200) {
+        final List data = jsonDecode(response.body);
+        categories.value = List<String>.from(data);
+      }
+    } catch (e) {
+      debugPrint('Error fetching categories: $e');
+    }
+  }
+
+  /// Récupération des conditions
+  Future<void> fetchConditions() async {
+    try {
+      final response = await client.get(Uri.parse('$apiUrl/listings/meta/conditions'));
+      if (response.statusCode == 200) {
+        final List data = jsonDecode(response.body);
+        conditions.value = List<String>.from(data);
+      }
+    } catch (e) {
+      debugPrint('Error fetching conditions: $e');
+    }
+  }
+
+  /// Story A1 / B4 - Récupération filtrée du feed
   Future<void> fetchListings({
     int? cityId,
     String? category,
     String? condition,
     double? minValue,
     double? maxValue,
+    String? search,
     int page = 1,
     int limit = 20,
   }) async {
@@ -80,85 +173,72 @@ class ListingsController extends GetxController {
     errorMessage.value = '';
 
     try {
-      String query = '$apiUrl/listings?page=$page&limit=$limit';
+      final queryParams = <String, String>{
+        'page': page.toString(),
+        'limit': limit.toString(),
+      };
 
-      if (cityId != null) query += '&cityId=$cityId';
-      if (category != null && category.isNotEmpty) query += '&category=$category';
-      if (condition != null && condition.isNotEmpty) query += '&condition=$condition';
-      if (minValue != null) query += '&minValue=$minValue';
-      if (maxValue != null) query += '&maxValue=$maxValue';
+      final effectiveCityId = cityId ?? selectedCityId.value;
+      if (effectiveCityId != null) queryParams['cityId'] = effectiveCityId.toString();
 
-      final response = await client.get(Uri.parse(query));
+      final effectiveCategory = category ?? (selectedCategory.value.isNotEmpty ? selectedCategory.value : null);
+      if (effectiveCategory != null && effectiveCategory.isNotEmpty && effectiveCategory != 'Tous') {
+        queryParams['category'] = effectiveCategory;
+      }
+
+      if (condition != null && condition.isNotEmpty) queryParams['condition'] = condition;
+      if (minValue != null) queryParams['minValue'] = minValue.toString();
+      if (maxValue != null) queryParams['maxValue'] = maxValue.toString();
+      if (search != null && search.isNotEmpty) queryParams['search'] = search;
+
+      final uri = Uri.parse('$apiUrl/listings').replace(queryParameters: queryParams);
+      final response = await client.get(uri);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final listingsData = data['listings'] as List;
+        final listingsData = (data['listings'] as List?) ?? [];
         listings.value = listingsData.map((l) => ListingModel.fromJson(l)).toList();
       } else {
-        errorMessage.value = 'Failed to load listings';
-        Get.snackbar('Error', errorMessage.value);
+        errorMessage.value = 'Échec du chargement des annonces';
       }
     } catch (e) {
-      errorMessage.value = 'Network error: $e';
-      Get.snackbar('Error', errorMessage.value);
+      errorMessage.value = 'Erreur réseau: $e';
     } finally {
       isLoading.value = false;
     }
   }
 
-  Future<void> fetchCategories() async {
-    try {
-      final response = await client.get(Uri.parse('$apiUrl/listings/meta/categories'));
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        categories.value = List<String>.from(data);
-      }
-    } catch (e) {
-      print('Error fetching categories: $e');
+  /// Story B5 - Changer de ville
+  void changeCity(String cityName) {
+    selectedCity.value = cityName;
+    final found = cities.firstWhereOrNull((c) => c.name == cityName);
+    if (found != null) {
+      selectedCityId.value = found.id;
     }
+    fetchListings(cityId: selectedCityId.value);
   }
 
-  Future<void> fetchConditions() async {
-    try {
-      final response = await client.get(Uri.parse('$apiUrl/listings/meta/conditions'));
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        conditions.value = List<String>.from(data);
-      }
-    } catch (e) {
-      print('Error fetching conditions: $e');
-    }
-  }
+  void filterByCity(String cityName) => changeCity(cityName);
 
-  void changeCity(String city) {
-    selectedCity.value = city;
-    final cityMap = {
-      'Meknès': 1,
-      'Fès': 2,
-      'Rabat': 3,
-      'Casablanca': 4,
-      'Marrakech': 5,
-    };
-    fetchListings(cityId: cityMap[city] ?? 1);
-  }
-
-  void filterByCategory(String category) {
-    selectedCategory.value = category;
-    final cityMap = {
-      'Meknès': 1,
-      'Fès': 2,
-      'Rabat': 3,
-      'Casablanca': 4,
-      'Marrakech': 5,
-    };
+  /// Filtrer par catégorie
+  void filterByCategory(String cat) {
+    selectedCategory.value = cat;
     fetchListings(
-      cityId: cityMap[selectedCity.value] ?? 1,
-      category: category.isEmpty ? null : category,
+      cityId: selectedCityId.value,
+      category: (cat.isEmpty || cat == 'Tous') ? null : cat,
     );
   }
 
-  Future<void> createListing(
-    String userId, {
+  /// Recherche par mot clé
+  Future<void> searchListings(String keyword) async {
+    await fetchListings(
+      cityId: selectedCityId.value,
+      search: keyword.trim().isEmpty ? null : keyword.trim(),
+    );
+  }
+
+  /// Story B1 & B2 - Publier une annonce
+  Future<bool> createListing({
     required String title,
     required String description,
     required String category,
@@ -166,13 +246,15 @@ class ListingsController extends GetxController {
     required double estimatedValue,
     required int cityId,
     List<String> photos = const [],
+    Map<String, dynamic> attributes = const {},
   }) async {
     isLoading.value = true;
 
     try {
+      final headers = _getAuthHeaders();
       final response = await client.post(
-        Uri.parse('$apiUrl/listings?userId=$userId'),
-        headers: {'Content-Type': 'application/json'},
+        Uri.parse('$apiUrl/listings'),
+        headers: headers,
         body: jsonEncode({
           'title': title,
           'description': description,
@@ -181,42 +263,128 @@ class ListingsController extends GetxController {
           'estimatedValue': estimatedValue,
           'cityId': cityId,
           'photos': photos,
+          'attributes': attributes,
         }),
       );
 
       if (response.statusCode == 201 || response.statusCode == 200) {
-        Get.snackbar('Success', 'Listing published!');
-        Get.back();
+        Get.snackbar(
+          'Succès',
+          'Votre annonce a été publiée avec succès !',
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+        );
         await fetchListings();
+        return true;
+      } else if (response.statusCode == 409) {
+        final err = jsonDecode(response.body);
+        Get.snackbar(
+          'Annonce existante (Règle B2)',
+          err['message'] ?? 'Vous avez déjà une annonce identique active.',
+          backgroundColor: Colors.orange,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 4),
+        );
+        return false;
       } else {
-        final error = jsonDecode(response.body);
-        Get.snackbar('Error', error['message'] ?? 'Failed to create listing');
+        final err = jsonDecode(response.body);
+        Get.snackbar(
+          'Erreur',
+          err['message'] ?? 'Impossible de publier l\'annonce',
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+        return false;
       }
     } catch (e) {
-      Get.snackbar('Error', 'Network error: $e');
+      Get.snackbar(
+        'Erreur réseau',
+        e.toString(),
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      return false;
     } finally {
       isLoading.value = false;
     }
   }
 
-  void filterByCity(String city) => changeCity(city);
-
-  Future<void> searchListings(String keyword) async {
-    isLoading.value = true;
+  /// Story B3 - Récupérer mes propres annonces avec filtre de statut
+  Future<void> fetchMyListings({String? status}) async {
+    isMyListingsLoading.value = true;
     try {
-      final response = await client.get(Uri.parse('$apiUrl/listings?search=$keyword'));
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final list = (data['listings'] as List?) ?? [];
-        listings.value = list.map((l) => ListingModel.fromJson(l)).toList();
+      final headers = _getAuthHeaders();
+      var url = '$apiUrl/listings/user/my-listings';
+      if (status != null && status.isNotEmpty) {
+        url += '?status=$status';
       }
-    } catch (_) {
+      final response = await client.get(Uri.parse(url), headers: headers);
+      if (response.statusCode == 200) {
+        final List data = jsonDecode(response.body);
+        myListings.value = data.map((l) => ListingModel.fromJson(l)).toList();
+      } else {
+        myListings.clear();
+      }
+    } catch (e) {
+      debugPrint('Error fetchMyListings: $e');
     } finally {
-      isLoading.value = false;
+      isMyListingsLoading.value = false;
     }
   }
 
-  Future<void> publishListingEnhanced({
+  /// Story B3 - Changer le statut d'une annonce (archiver / réactiver)
+  Future<bool> changeListingStatus(String listingId, String newStatus) async {
+    try {
+      final headers = _getAuthHeaders();
+      final response = await client.patch(
+        Uri.parse('$apiUrl/listings/$listingId/status'),
+        headers: headers,
+        body: jsonEncode({'status': newStatus}),
+      );
+
+      if (response.statusCode == 200) {
+        Get.snackbar('Succès', 'Statut de l\'annonce mis à jour ($newStatus)');
+        await fetchMyListings();
+        await fetchListings();
+        return true;
+      } else {
+        final err = jsonDecode(response.body);
+        Get.snackbar('Erreur', err['message'] ?? 'Action impossible');
+        return false;
+      }
+    } catch (e) {
+      Get.snackbar('Erreur réseau', e.toString());
+      return false;
+    }
+  }
+
+  /// Story B3 - Supprimer une annonce
+  Future<bool> deleteListing(String listingId) async {
+    try {
+      final headers = _getAuthHeaders();
+      final response = await client.delete(
+        Uri.parse('$apiUrl/listings/$listingId'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        Get.snackbar('Succès', 'Annonce supprimée avec succès');
+        await fetchMyListings();
+        await fetchListings();
+        return true;
+      } else {
+        final err = jsonDecode(response.body);
+        Get.snackbar('Erreur', err['message'] ?? 'Suppression impossible');
+        return false;
+      }
+    } catch (e) {
+      Get.snackbar('Erreur réseau', e.toString());
+      return false;
+    }
+  }
+
+  /// Méthode helper appelée depuis create_listing_screen.dart
+  Future<bool> publishListingEnhanced({
     required String title,
     required String description,
     required String category,
@@ -227,393 +395,26 @@ class ListingsController extends GetxController {
     required Map<String, dynamic> attributes,
     required List<String> wishes,
   }) async {
-    final cityMap = {
-      'Meknès': 1,
-      'Fès': 2,
-      'Rabat': 3,
-      'Casablanca': 4,
-      'Marrakech': 5,
-    };
-    await createListing(
-      'current-user',
+    int cityId = 1;
+    final found = cities.firstWhereOrNull((c) => c.name == city);
+    if (found != null) {
+      cityId = found.id;
+    }
+
+    final combinedAttributes = Map<String, dynamic>.from(attributes);
+    if (wishes.isNotEmpty) {
+      combinedAttributes['wishes'] = wishes;
+    }
+
+    return await createListing(
       title: title,
       description: description,
       category: category,
       condition: condition,
       estimatedValue: estimatedValue,
-      cityId: cityMap[city] ?? 1,
+      cityId: cityId,
       photos: photos,
-    );
-  }
-}
-
-// Listings Feed Screen
-class ListingsFeedScreen extends StatelessWidget {
-  final ListingsController controller = Get.find();
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Trocly Feed'),
-        elevation: 0,
-      ),
-      body: Obx(
-        () => Column(
-          children: [
-            // City Selector
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Obx(
-                () => DropdownButton(
-                  isExpanded: true,
-                  value: controller.selectedCity.value,
-                  onChanged: (newVal) => controller.changeCity(newVal ?? 'Meknès'),
-                  items: ['Meknès', 'Fès', 'Rabat', 'Casablanca', 'Marrakech']
-                      .map((city) => DropdownMenuItem(value: city, child: Text(city)))
-                      .toList(),
-                ),
-              ),
-            ),
-            // Category Filter
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Obx(
-                () => controller.categories.isEmpty
-                    ? const SizedBox.shrink()
-                    : SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            Chip(
-                              label: const Text('All'),
-                              onDeleted:
-                                  controller.selectedCategory.value.isEmpty ? null : () {},
-                            ),
-                            ...controller.categories.map((cat) {
-                              return Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 4),
-                                child: GestureDetector(
-                                  onTap: () => controller.filterByCategory(cat),
-                                  child: Chip(
-                                    label: Text(cat),
-                                  ),
-                                ),
-                              );
-                            }).toList(),
-                          ],
-                        ),
-                      ),
-              ),
-            ),
-            const SizedBox(height: 10),
-            // Listings Grid
-            Expanded(
-              child: controller.isLoading.value
-                  ? const Center(child: CircularProgressIndicator())
-                  : controller.listings.isEmpty
-                      ? const Center(
-                          child: Text('No listings found'),
-                        )
-                      : GridView.builder(
-                          padding: const EdgeInsets.all(8),
-                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            childAspectRatio: 0.8,
-                            crossAxisSpacing: 10,
-                            mainAxisSpacing: 10,
-                          ),
-                          itemCount: controller.listings.length,
-                          itemBuilder: (context, index) {
-                            final listing = controller.listings[index];
-                            return GestureDetector(
-                              onTap: () => Get.to(
-                                () => ListingDetailScreen(listing: listing),
-                              ),
-                              child: Card(
-                                elevation: 2,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Expanded(
-                                      child: Container(
-                                        color: Colors.grey[300],
-                                        child: listing.photos.isNotEmpty
-                                            ? Image.network(
-                                                listing.photos.first,
-                                                fit: BoxFit.cover,
-                                                errorBuilder: (_, __, ___) =>
-                                                    const Icon(Icons.image),
-                                              )
-                                            : const Icon(Icons.image, size: 80),
-                                      ),
-                                    ),
-                                    Padding(
-                                      padding: const EdgeInsets.all(8),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            listing.title,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(fontWeight: FontWeight.bold),
-                                          ),
-                                          Text(
-                                            '${listing.estimatedValue} MAD',
-                                            style: const TextStyle(
-                                              color: Colors.green,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                          Text(
-                                            listing.condition,
-                                            style: const TextStyle(fontSize: 12),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => Get.to(() => PublishListingScreen()),
-        child: const Icon(Icons.add),
-      ),
-    );
-  }
-}
-
-// Listing Detail Screen
-class ListingDetailScreen extends StatelessWidget {
-  final ListingModel listing;
-
-  const ListingDetailScreen({required this.listing});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Listing Details')),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Photo carousel
-            SizedBox(
-              height: 250,
-              child: listing.photos.isEmpty
-                  ? Container(
-                      color: Colors.grey[300],
-                      child: const Center(child: Icon(Icons.image, size: 100)),
-                    )
-                  : PageView(
-                      children: listing.photos
-                          .map(
-                            (photo) => Image.network(
-                              photo,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) =>
-                                  Container(
-                                    color: Colors.grey[300],
-                                    child: const Icon(Icons.image, size: 100),
-                                  ),
-                            ),
-                          )
-                          .toList(),
-                    ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    listing.title,
-                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '${listing.estimatedValue} MAD',
-                    style: const TextStyle(
-                      fontSize: 20,
-                      color: Colors.green,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    listing.description,
-                    style: const TextStyle(fontSize: 14, color: Colors.grey),
-                  ),
-                  const SizedBox(height: 20),
-                  Row(
-                    children: [
-                      Chip(label: Text(listing.category)),
-                      const SizedBox(width: 10),
-                      Chip(label: Text(listing.condition)),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  ElevatedButton(
-                    onPressed: () => Get.to(
-                      () => MakeOfferScreen(listing: listing),
-                    ),
-                    style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
-                    child: const Text('Make an Offer'),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// Publish Listing Screen
-class PublishListingScreen extends StatefulWidget {
-  @override
-  _PublishListingScreenState createState() => _PublishListingScreenState();
-}
-
-class _PublishListingScreenState extends State<PublishListingScreen> {
-  final ListingsController controller = Get.find();
-  final titleController = TextEditingController();
-  final descriptionController = TextEditingController();
-  final estimatedValueController = TextEditingController();
-
-  String selectedCategory = 'Electronics';
-  String selectedCondition = 'Good';
-  String selectedCity = 'Meknès';
-
-  @override
-  void dispose() {
-    titleController.dispose();
-    descriptionController.dispose();
-    estimatedValueController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final cityMap = {
-      'Meknès': 1,
-      'Fès': 2,
-      'Rabat': 3,
-      'Casablanca': 4,
-      'Marrakech': 5,
-    };
-
-    return Scaffold(
-      appBar: AppBar(title: const Text('Publish Listing')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            TextField(
-              controller: titleController,
-              decoration: InputDecoration(
-                labelText: 'Title',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: descriptionController,
-              maxLines: 3,
-              decoration: InputDecoration(
-                labelText: 'Description',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-            ),
-            const SizedBox(height: 16),
-            DropdownButtonFormField(
-              value: selectedCategory,
-              onChanged: (newVal) => setState(() => selectedCategory = newVal ?? ''),
-              items: ['Electronics', 'Furniture', 'Sports', 'Clothing', 'Books', 'Other']
-                  .map((cat) => DropdownMenuItem(value: cat, child: Text(cat)))
-                  .toList(),
-              decoration: InputDecoration(
-                labelText: 'Category',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-            ),
-            const SizedBox(height: 16),
-            DropdownButtonFormField(
-              value: selectedCondition,
-              onChanged: (newVal) => setState(() => selectedCondition = newVal ?? ''),
-              items: ['Like New', 'Good', 'Fair', 'Poor']
-                  .map((cond) => DropdownMenuItem(value: cond, child: Text(cond)))
-                  .toList(),
-              decoration: InputDecoration(
-                labelText: 'Condition',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: estimatedValueController,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: 'Estimated Value (MAD)',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-            ),
-            const SizedBox(height: 16),
-            DropdownButtonFormField(
-              value: selectedCity,
-              onChanged: (newVal) => setState(() => selectedCity = newVal ?? ''),
-              items: ['Meknès', 'Fès', 'Rabat', 'Casablanca', 'Marrakech']
-                  .map((city) => DropdownMenuItem(value: city, child: Text(city)))
-                  .toList(),
-              decoration: InputDecoration(
-                labelText: 'City',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Obx(
-              () => ElevatedButton(
-                onPressed: controller.isLoading.value
-                    ? null
-                    : () {
-                        if (titleController.text.isEmpty ||
-                            estimatedValueController.text.isEmpty) {
-                          Get.snackbar('Error', 'Please fill all required fields');
-                          return;
-                        }
-
-                        controller.createListing(
-                          'current-user-id', // TODO: Get from auth
-                          title: titleController.text,
-                          description: descriptionController.text,
-                          category: selectedCategory,
-                          condition: selectedCondition,
-                          estimatedValue: double.parse(estimatedValueController.text),
-                          cityId: cityMap[selectedCity] ?? 1,
-                        );
-                      },
-                style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
-                child: controller.isLoading.value
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(),
-                      )
-                    : const Text('Publish'),
-              ),
-            ),
-          ],
-        ),
-      ),
+      attributes: combinedAttributes,
     );
   }
 }

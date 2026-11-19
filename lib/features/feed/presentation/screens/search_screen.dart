@@ -15,17 +15,22 @@ class SearchScreen extends StatefulWidget {
 class _SearchScreenState extends State<SearchScreen> {
   final ListingsController _listingsController = Get.find<ListingsController>();
   final _searchController = TextEditingController();
+  final _minPriceController = TextEditingController();
+  final _maxPriceController = TextEditingController();
 
   String? _selectedCategory;
   String? _selectedCondition;
+  String? _selectedCity;
 
   final List<String> _categories = const [
+    'Tous',
     'Électronique',
     'Maison',
     'Véhicules',
     'Vêtements',
     'Sport',
     'Livres',
+    'Bricolage',
   ];
 
   final List<String> _conditions = const [
@@ -36,18 +41,40 @@ class _SearchScreenState extends State<SearchScreen> {
     'use',
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    _selectedCity = _listingsController.selectedCity.value;
+  }
+
   void _applyFilters() {
-    _listingsController.searchListings(_searchController.text.trim());
-    if (_selectedCategory != null) {
-      _listingsController.filterByCategory(_selectedCategory!);
+    int? cityId;
+    if (_selectedCity != null) {
+      final found = _listingsController.cities.firstWhereOrNull((c) => c.name == _selectedCity);
+      if (found != null) cityId = found.id;
     }
+
+    final double? minVal = double.tryParse(_minPriceController.text.trim());
+    final double? maxVal = double.tryParse(_maxPriceController.text.trim());
+
+    _listingsController.fetchListings(
+      search: _searchController.text.trim().isEmpty ? null : _searchController.text.trim(),
+      category: (_selectedCategory == null || _selectedCategory == 'Tous') ? null : _selectedCategory,
+      condition: _selectedCondition,
+      cityId: cityId,
+      minValue: minVal,
+      maxValue: maxVal,
+    );
   }
 
   void _reset() {
     setState(() {
       _searchController.clear();
+      _minPriceController.clear();
+      _maxPriceController.clear();
       _selectedCategory = null;
       _selectedCondition = null;
+      _selectedCity = _listingsController.selectedCity.value;
     });
     _listingsController.fetchListings();
   }
@@ -55,6 +82,8 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _minPriceController.dispose();
+    _maxPriceController.dispose();
     super.dispose();
   }
 
@@ -78,90 +107,119 @@ class _SearchScreenState extends State<SearchScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Search Input
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  hintText: 'Que recherchez-vous ? (ex. vélo, iPhone...)',
-                  prefixIcon: const Icon(Icons.search, color: AppColors.primary),
-                  filled: true,
-                  fillColor: AppColors.surface,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: AppColors.border),
-                  ),
-                ),
-                onSubmitted: (_) => _applyFilters(),
-              ),
-            ),
-            // Filter Pills
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            // Search Input Box
+            Container(
+              padding: const EdgeInsets.all(16),
+              color: AppColors.surface,
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Catégories', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                  const SizedBox(height: 6),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: _categories.map((cat) {
-                        final isSel = cat == _selectedCategory;
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 6.0),
-                          child: ChoiceChip(
-                            label: Text(cat),
-                            selected: isSel,
-                            selectedColor: AppColors.primary,
-                            backgroundColor: AppColors.surface,
-                            labelStyle: TextStyle(color: isSel ? Colors.white : AppColors.primary, fontSize: 11),
-                            onSelected: (val) {
-                              setState(() => _selectedCategory = val ? cat : null);
-                              _applyFilters();
-                            },
-                          ),
-                        );
-                      }).toList(),
+                  TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText: 'Que recherchez-vous ? (ex: iPhone, Vélo...)',
+                      prefixIcon: const Icon(Icons.search, color: AppColors.primary),
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.send_rounded, color: AppColors.primary),
+                        onPressed: _applyFilters,
+                      ),
+                      filled: true,
+                      fillColor: AppColors.background,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
                     ),
+                    onSubmitted: (_) => _applyFilters(),
                   ),
-                  const SizedBox(height: 10),
-                  const Text('État', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 12),
+                  // Filtres déroulants : Catégorie & Condition & Ville
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
-                      children: _conditions.map((cond) {
-                        final isSel = cond == _selectedCondition;
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 6.0),
-                          child: ChoiceChip(
-                            label: Text(cond.replaceAll('_', ' ')),
-                            selected: isSel,
-                            selectedColor: AppColors.accent,
-                            backgroundColor: AppColors.surface,
-                            labelStyle: TextStyle(color: isSel ? Colors.white : AppColors.textPrimary, fontSize: 11),
-                            onSelected: (val) {
-                              setState(() => _selectedCondition = val ? cond : null);
+                      children: [
+                        // Dropdown Ville
+                        Obx(() {
+                          final cities = _listingsController.cities;
+                          return DropdownButton<String>(
+                            value: _selectedCity,
+                            hint: const Text('Ville'),
+                            underline: const SizedBox.shrink(),
+                            items: cities.map((c) {
+                              return DropdownMenuItem(value: c.name, child: Text(c.name));
+                            }).toList(),
+                            onChanged: (val) {
+                              setState(() => _selectedCity = val);
                               _applyFilters();
                             },
-                          ),
-                        );
-                      }).toList(),
+                          );
+                        }),
+                        const SizedBox(width: 12),
+                        // Dropdown Catégorie
+                        DropdownButton<String>(
+                          value: _selectedCategory,
+                          hint: const Text('Catégorie'),
+                          underline: const SizedBox.shrink(),
+                          items: _categories.map((c) {
+                            return DropdownMenuItem(value: c, child: Text(c));
+                          }).toList(),
+                          onChanged: (val) {
+                            setState(() => _selectedCategory = val);
+                            _applyFilters();
+                          },
+                        ),
+                        const SizedBox(width: 12),
+                        // Dropdown Condition
+                        DropdownButton<String>(
+                          value: _selectedCondition,
+                          hint: const Text('État'),
+                          underline: const SizedBox.shrink(),
+                          items: _conditions.map((c) {
+                            return DropdownMenuItem(value: c, child: Text(c));
+                          }).toList(),
+                          onChanged: (val) {
+                            setState(() => _selectedCondition = val);
+                            _applyFilters();
+                          },
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
-            const Divider(height: 24),
-            // Results list
+            const Divider(height: 1),
+
+            // Résultats
             Expanded(
               child: Obx(() {
-                final list = _listingsController.listings;
-                if (list.isEmpty) {
+                if (_listingsController.isLoading.value) {
                   return const Center(
-                    child: Text('Aucun résultat correspondant aux critères'),
+                    child: CircularProgressIndicator(color: AppColors.primary),
+                  );
+                }
+
+                if (_listingsController.listings.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: const [
+                        Icon(Icons.search_off_rounded, size: 64, color: AppColors.textHint),
+                        SizedBox(height: 12),
+                        Text(
+                          'Aucun résultat pour cette recherche',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        SizedBox(height: 6),
+                        Text(
+                          'Essayez d\'ajuster vos critères ou mots-clés.',
+                          style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                        ),
+                      ],
+                    ),
                   );
                 }
 
@@ -173,16 +231,19 @@ class _SearchScreenState extends State<SearchScreen> {
                     crossAxisSpacing: 12,
                     mainAxisSpacing: 12,
                   ),
-                  itemCount: list.length,
-                  itemBuilder: (ctx, i) {
-                    final item = list[i];
+                  itemCount: _listingsController.listings.length,
+                  itemBuilder: (context, index) {
+                    final item = _listingsController.listings[index];
                     return ListingCard(
                       id: item.id,
                       title: item.title,
                       condition: item.condition,
                       cityName: item.city,
+                      relativeTime: 'Résultat',
                       photoUrl: item.photos.isNotEmpty ? item.photos.first : null,
-                      onTap: () => Get.toNamed('/listing/${item.id}', arguments: item),
+                      onTap: () {
+                        Get.toNamed('/listing/${item.id}', arguments: item);
+                      },
                     );
                   },
                 );

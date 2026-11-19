@@ -26,22 +26,14 @@ class _FeedScreenState extends State<FeedScreen> {
     'Vêtements',
     'Livres',
     'Sport',
-  ];
-
-  final List<String> _cities = const [
-    'Meknès',
-    'Fès',
-    'Rabat',
-    'Casablanca',
-    'Marrakech',
-    'Tanger',
-    'Agadir',
+    'Bricolage',
   ];
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _listingsController.fetchCities();
       _listingsController.fetchListings();
     });
   }
@@ -53,44 +45,52 @@ class _FeedScreenState extends State<FeedScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) {
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Changer de ville',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 12),
-              ..._cities.map((city) {
-                final isSelected = city == _authController.selectedCity.value;
-                return ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(
-                    city,
-                    style: TextStyle(
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                      color: isSelected ? AppColors.primary : AppColors.textPrimary,
-                    ),
+        return Obx(() {
+          final cities = _listingsController.cities;
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Changer de ville',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
                   ),
-                  trailing: isSelected ? const Icon(Icons.check, color: AppColors.primary) : null,
-                  onTap: () {
-                    _authController.selectedCity.value = city;
-                    _listingsController.selectedCity.value = city;
-                    _listingsController.filterByCity(city);
-                    Navigator.pop(ctx);
-                  },
-                );
-              }).toList(),
-            ],
-          ),
-        );
+                ),
+                const SizedBox(height: 12),
+                if (cities.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.all(16.0),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else
+                  ...cities.map((city) {
+                    final isSelected = city.name == _listingsController.selectedCity.value;
+                    return ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(
+                        city.name,
+                        style: TextStyle(
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          color: isSelected ? AppColors.primary : AppColors.textPrimary,
+                        ),
+                      ),
+                      trailing: isSelected ? const Icon(Icons.check, color: AppColors.primary) : null,
+                      onTap: () {
+                        _authController.selectedCity.value = city.name;
+                        _listingsController.changeCity(city.name);
+                        Navigator.pop(ctx);
+                      },
+                    );
+                  }).toList(),
+              ],
+            ),
+          );
+        });
       },
     );
   }
@@ -105,7 +105,7 @@ class _FeedScreenState extends State<FeedScreen> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Obx(() => Text('Trocly · ${_authController.selectedCity.value} ▾')),
+              Obx(() => Text('Trocly · ${_listingsController.selectedCity.value} ▾')),
             ],
           ),
         ),
@@ -135,7 +135,7 @@ class _FeedScreenState extends State<FeedScreen> {
       bottomNavigationBar: Obx(() {
         final loggedIn = _authController.authToken.value.isNotEmpty;
         if (!loggedIn) {
-          return const SizedBox.shrink(); // No nav bar for guest (Wireframe 02)
+          return const SizedBox.shrink();
         }
         return NavigationBar(
           selectedIndex: 0,
@@ -185,7 +185,7 @@ class _FeedScreenState extends State<FeedScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Banner
+              // Bannière
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
@@ -213,7 +213,7 @@ class _FeedScreenState extends State<FeedScreen> {
                           ),
                           SizedBox(height: 6),
                           Text(
-                            'Échangez facilement et en sécurité par QR code.',
+                            'Échangez facilement et en toute sécurité par QR code.',
                             style: TextStyle(
                               color: Colors.white70,
                               fontSize: 12,
@@ -253,7 +253,7 @@ class _FeedScreenState extends State<FeedScreen> {
                       onSelected: (selected) {
                         setState(() => _selectedCategoryIndex = index);
                         if (index == 0) {
-                          _listingsController.fetchListings();
+                          _listingsController.filterByCategory('Tous');
                         } else {
                           _listingsController.filterByCategory(_categories[index]);
                         }
@@ -279,7 +279,7 @@ class _FeedScreenState extends State<FeedScreen> {
                   const SizedBox(width: 8),
                   ActionChip(
                     avatar: const Icon(Icons.location_city, size: 16, color: AppColors.primary),
-                    label: Obx(() => Text(_authController.selectedCity.value)),
+                    label: Obx(() => Text(_listingsController.selectedCity.value)),
                     backgroundColor: AppColors.surface,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
@@ -294,7 +294,7 @@ class _FeedScreenState extends State<FeedScreen> {
               Obx(() {
                 final count = _listingsController.listings.length;
                 return Text(
-                  'Annonces récentes · $count objet${count > 1 ? 's' : ''}',
+                  'Annonces actives · $count objet${count > 1 ? 's' : ''}',
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.bold,
@@ -332,14 +332,15 @@ class _FeedScreenState extends State<FeedScreen> {
                         ),
                         const SizedBox(height: 6),
                         const Text(
-                          'Élargissez votre recherche aux autres villes marocaines.',
+                          'Élargissez votre recherche aux autres villes marocaines ou publiez le premier objet !',
                           textAlign: TextAlign.center,
                           style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                         ),
                         const SizedBox(height: 16),
-                        OutlinedButton(
+                        OutlinedButton.icon(
                           onPressed: _showCityPicker,
-                          child: const Text('Changer de ville'),
+                          icon: const Icon(Icons.location_on),
+                          label: const Text('Changer de ville'),
                         ),
                       ],
                     ),
@@ -363,7 +364,7 @@ class _FeedScreenState extends State<FeedScreen> {
                       title: item.title,
                       condition: item.condition,
                       cityName: item.city,
-                      relativeTime: 'Il y a peu',
+                      relativeTime: 'Actif',
                       photoUrl: item.photos.isNotEmpty ? item.photos.first : null,
                       onTap: () {
                         Get.toNamed('/listing/${item.id}', arguments: item);
