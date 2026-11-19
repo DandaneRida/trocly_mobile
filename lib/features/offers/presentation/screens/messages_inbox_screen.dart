@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../../../controllers/auth_controller.dart';
 import '../../../../controllers/chat_controller.dart';
-import '../../../../controllers/offers_controller.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/state_page.dart';
+import '../../../../core/widgets/trocly_bottom_nav.dart';
 
 class MessagesInboxScreen extends StatefulWidget {
   const MessagesInboxScreen({Key? key}) : super(key: key);
@@ -11,9 +14,10 @@ class MessagesInboxScreen extends StatefulWidget {
   State<MessagesInboxScreen> createState() => _MessagesInboxScreenState();
 }
 
-class _MessagesInboxScreenState extends State<MessagesInboxScreen> with SingleTickerProviderStateMixin {
+class _MessagesInboxScreenState extends State<MessagesInboxScreen>
+    with SingleTickerProviderStateMixin {
   final ChatController _chatController = Get.find<ChatController>();
-  final OffersController _offersController = Get.find<OffersController>();
+  final AuthController _authController = Get.find<AuthController>();
   late TabController _tabController;
 
   @override
@@ -31,100 +35,235 @@ class _MessagesInboxScreenState extends State<MessagesInboxScreen> with SingleTi
     super.dispose();
   }
 
+  String _statusLabel(String status) {
+    switch (status) {
+      case 'pending':
+        return 'En attente';
+      case 'countered':
+        return 'Contre-offre';
+      case 'accepted':
+        return 'Acceptée';
+      case 'rejected':
+        return 'Refusée';
+      case 'cancelled':
+        return 'Annulée';
+      default:
+        return status;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.paper,
+      bottomNavigationBar: const TroclyBottomNav(currentIndex: 3),
       appBar: AppBar(
-        title: const Text('Messages'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Get.back(),
-        ),
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: AppColors.accent,
-          indicatorWeight: 3,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          tabs: const [
-            Tab(text: 'Tous'),
-            Tab(text: 'En cours'),
-            Tab(text: 'Terminés'),
-          ],
+        title: Text('Messages', style: AppTypography.serif(size: 24)),
+        automaticallyImplyLeading: false,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(44),
+          child: Container(
+            decoration: const BoxDecoration(
+              border: Border(bottom: BorderSide(color: AppColors.line)),
+            ),
+            child: TabBar(
+              controller: _tabController,
+              indicatorColor: AppColors.ink,
+              indicatorWeight: 2,
+              labelColor: AppColors.ink,
+              unselectedLabelColor: AppColors.textSecondary,
+              labelStyle: AppTypography.sans(size: 13.5, weight: FontWeight.w600),
+              unselectedLabelStyle: AppTypography.sans(size: 13.5),
+              dividerColor: Colors.transparent,
+              tabs: const [
+                Tab(text: 'Tous'),
+                Tab(text: 'En cours'),
+                Tab(text: 'Terminés'),
+              ],
+            ),
+          ),
         ),
       ),
       body: Obx(() {
-        if (_chatController.isLoading.value) {
-          return const Center(child: CircularProgressIndicator(color: AppColors.primary));
-        }
-
-        final convs = _chatController.conversations;
-        if (convs.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: const [
-                Icon(Icons.chat_bubble_outline, size: 54, color: AppColors.textHint),
-                SizedBox(height: 12),
-                Text('Aucune conversation pour l\'instant', style: TextStyle(color: AppColors.textSecondary)),
-              ],
-            ),
+        if (_authController.authToken.value.isEmpty) {
+          return StatePage(
+            type: StatePageType.emptyResults,
+            customTitle: 'Connectez-vous pour discuter',
+            customMessage: 'Vos négociations et échanges en cours apparaîtront ici.',
+            actionLabel: 'Se connecter',
+            onAction: () => Get.toNamed('/login'),
           );
         }
 
-        return ListView.separated(
-          padding: const EdgeInsets.all(16),
-          itemCount: convs.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 10),
-          itemBuilder: (ctx, idx) {
-            final conv = convs[idx];
-            return Container(
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                leading: Container(
-                  width: 48,
-                  height: 48,
-                  decoration: const BoxDecoration(
-                    color: AppColors.divider,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.person, color: AppColors.primary),
-                ),
-                title: Text(
-                  conv.otherUserName,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                ),
-                subtitle: Text(
-                  conv.lastMessage,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                ),
-                trailing: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.divider,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    conv.offerStatus,
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primary),
-                  ),
-                ),
-                onTap: () {
-                  Get.toNamed('/chat/${conv.offerId}', arguments: conv);
-                },
-              ),
-            );
-          },
+        if (_chatController.isLoading.value && _chatController.conversations.isEmpty) {
+          return const Center(
+            child: CircularProgressIndicator(color: AppColors.ink, strokeWidth: 2),
+          );
+        }
+
+        return TabBarView(
+          controller: _tabController,
+          children: [
+            _buildList(_chatController.conversations),
+            _buildList(_chatController.conversations
+                .where((c) =>
+                    c.offerStatus == 'pending' ||
+                    c.offerStatus == 'countered' ||
+                    c.offerStatus == 'accepted')
+                .toList()),
+            _buildList(_chatController.conversations
+                .where((c) =>
+                    c.offerStatus == 'rejected' || c.offerStatus == 'cancelled')
+                .toList()),
+          ],
         );
       }),
+    );
+  }
+
+  Widget _buildList(List<ConversationModel> list) {
+    if (list.isEmpty) {
+      return const StatePage(
+        type: StatePageType.emptyResults,
+        customTitle: 'Aucune conversation',
+        customMessage: 'Proposez un échange sur une annonce pour ouvrir une discussion en temps réel.',
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: () => _chatController.fetchConversations(),
+      color: AppColors.ink,
+      child: ListView.separated(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        itemCount: list.length,
+        separatorBuilder: (_, __) => const Divider(),
+        itemBuilder: (_, idx) {
+          final conv = list[idx];
+          final initials = conv.otherUserName
+              .split(' ')
+              .where((p) => p.isNotEmpty)
+              .take(2)
+              .map((p) => p[0].toUpperCase())
+              .join();
+          final isAccepted = conv.offerStatus == 'accepted';
+          final isPending = conv.offerStatus == 'pending' || conv.offerStatus == 'countered';
+
+          return InkWell(
+            onTap: () async {
+              await Get.toNamed('/chat/${conv.offerId}', arguments: conv);
+              _chatController.fetchConversations();
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 13),
+              child: Row(
+                children: [
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      CircleAvatar(
+                        radius: 23,
+                        backgroundColor: AppColors.bubble,
+                        child: Text(
+                          initials.isEmpty ? 'T' : initials,
+                          style: AppTypography.sans(
+                            size: 13.5,
+                            weight: FontWeight.w600,
+                            color: AppColors.ink,
+                          ),
+                        ),
+                      ),
+                      if (conv.unreadCount > 0)
+                        Positioned(
+                          top: -1,
+                          right: -1,
+                          child: Container(
+                            width: 11,
+                            height: 11,
+                            decoration: BoxDecoration(
+                              color: AppColors.accent,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: AppColors.paper, width: 2),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(width: 13),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                conv.otherUserName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTypography.sans(
+                                  size: 14.5,
+                                  weight: conv.unreadCount > 0
+                                      ? FontWeight.w700
+                                      : FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: isAccepted
+                                    ? AppColors.successLight
+                                    : isPending
+                                        ? AppColors.accentLight
+                                        : AppColors.bubble,
+                                borderRadius: BorderRadius.circular(5),
+                              ),
+                              child: Text(
+                                _statusLabel(conv.offerStatus),
+                                style: AppTypography.sans(
+                                  size: 10.5,
+                                  weight: FontWeight.w600,
+                                  color: isAccepted
+                                      ? AppColors.success
+                                      : isPending
+                                          ? AppColors.accent
+                                          : AppColors.textSecondary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (conv.itemSummary.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            conv.itemSummary,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTypography.sans(size: 11.5, color: AppColors.textHint),
+                          ),
+                        ],
+                        const SizedBox(height: 3),
+                        Text(
+                          conv.lastMessage,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTypography.sans(
+                            size: 13,
+                            weight: conv.unreadCount > 0 ? FontWeight.w500 : FontWeight.w400,
+                            color: conv.unreadCount > 0
+                                ? AppColors.ink
+                                : AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 }

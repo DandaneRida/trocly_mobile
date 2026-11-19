@@ -1,45 +1,65 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
-import 'dart:convert';
-import 'package:web_socket_channel/web_socket_channel.dart';
+import 'package:socket_io_client/socket_io_client.dart' as io;
+import 'auth_controller.dart';
 import '../core/constants/api_constants.dart';
 
-String get API_URL => ApiConstants.baseUrl;
-String get WS_URL => ApiConstants.wsUrl;
-
-// Conversation summary model (used by MessagesInboxScreen)
 class ConversationModel {
   final String offerId;
+  final String otherUserId;
   final String otherUserName;
   final String lastMessage;
   final String offerStatus;
+  final double soulte;
+  final bool isResponder;
+  final String itemSummary;
+  final DateTime? lastMessageAt;
+  final int unreadCount;
 
   ConversationModel({
     required this.offerId,
+    this.otherUserId = '',
     required this.otherUserName,
     required this.lastMessage,
     required this.offerStatus,
+    this.soulte = 0,
+    this.isResponder = false,
+    this.itemSummary = '',
+    this.lastMessageAt,
+    this.unreadCount = 0,
   });
 
   factory ConversationModel.fromJson(Map<String, dynamic> json) {
     return ConversationModel(
-      offerId: json['offerId'] ?? json['id'] ?? '',
-      otherUserName: json['otherUser']?['displayName'] ?? 'Utilisateur',
+      offerId: json['offerId']?.toString() ?? json['id']?.toString() ?? '',
+      otherUserId: json['otherUser']?['id']?.toString() ?? '',
+      otherUserName: json['otherUser']?['displayName'] ?? 'Membre Trocly',
       lastMessage: json['lastMessage'] ?? '',
       offerStatus: json['status'] ?? 'pending',
+      soulte: json['soulte'] != null
+          ? double.tryParse(json['soulte'].toString()) ?? 0
+          : 0,
+      isResponder: json['isResponder'] == true,
+      itemSummary: json['itemSummary'] ?? '',
+      lastMessageAt: json['lastMessageAt'] != null
+          ? DateTime.tryParse(json['lastMessageAt'].toString())
+          : null,
+      unreadCount: json['unreadCount'] is int ? json['unreadCount'] : 0,
     );
   }
 }
 
-// Models
 class ChatMessage {
-  String id;
-  String senderId;
-  String senderName;
-  String content;
-  DateTime timestamp;
-  bool isOwn;
+  final String id;
+  final String senderId;
+  final String senderName;
+  final String content;
+  final DateTime timestamp;
+  final bool isOwn;
+  final DateTime? readAt;
 
   ChatMessage({
     required this.id,
@@ -48,477 +68,253 @@ class ChatMessage {
     required this.content,
     required this.timestamp,
     required this.isOwn,
+    this.readAt,
   });
 
-  /// Alias used by chat_screen.dart
   bool get isMe => isOwn;
 
-  /// Formatted time string used by chat_screen.dart
-  String get timestampStr => '${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}';
+  String get timestampStr =>
+      '${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}';
 
   factory ChatMessage.fromJson(Map<String, dynamic> json, String currentUserId) {
+    final senderId =
+        json['senderId']?.toString() ?? json['sender']?['id']?.toString() ?? '';
+    final senderName =
+        json['senderName'] ?? json['sender']?['displayName'] ?? 'Membre';
+    final rawTime = json['createdAt'] ?? json['timestamp'];
     return ChatMessage(
-      id: json['id'],
-      senderId: json['sender']['id'],
-      senderName: json['sender']['displayName'] ?? 'Unknown',
-      content: json['content'],
-      timestamp: DateTime.parse(json['createdAt']),
-      isOwn: json['sender']['id'] == currentUserId,
+      id: json['id']?.toString() ?? '',
+      senderId: senderId,
+      senderName: senderName,
+      content: json['content'] ?? '',
+      timestamp: rawTime != null
+          ? (DateTime.tryParse(rawTime.toString())?.toLocal() ?? DateTime.now())
+          : DateTime.now(),
+      isOwn: senderId.isNotEmpty && senderId == currentUserId,
+      readAt: json['readAt'] != null
+          ? DateTime.tryParse(json['readAt'].toString())
+          : null,
     );
   }
 }
 
 class ChatController extends GetxController {
-  var messages = <ChatMessage>[].obs;
-  var conversations = <ConversationModel>[].obs;
-  var isLoading = false.obs;
-  var isConnected = false.obs;
-  var typingUsers = <String>[].obs;
-  var unreadCount = 0.obs;
-  var errorMessage = ''.obs;
+  final messages = <ChatMessage>[].obs;
+  final conversations = <ConversationModel>[].obs;
+  final typingUsers = <String>[].obs;
+  final isLoading = false.obs;
+  final isConnected = false.obs;
+  final unreadCount = 0.obs;
 
-  WebSocketChannel? _channel;
-  late WebSocketChannel channel;
-  final client = http.Client();
+  io.Socket? _socket;
+  String? _activeOfferId;
+  Timer? _typingTimer;
 
-  /// Fetch all conversations (used by MessagesInboxScreen)
+  String get _apiUrl => ApiConstants.baseUrl;
+
+  AuthController get _auth => Get.find<AuthController>();
+
+  Map<String, String> _getAuthHeaders() {
+    final token = _auth.authToken.value;
+    return {
+      'Content-Type': 'application/json',
+      if (token.isNotEmpty) 'Authorization': 'Bearer $token',
+    };
+  }
+
+  String get _currentUserId => _auth.userId.value;
+
   Future<void> fetchConversations() async {
+    if (_auth.authToken.value.isEmpty) return;
     isLoading.value = true;
     try {
-      final response = await client.get(
-        Uri.parse('$API_URL/offers/conversations'),
+      final resp = await http.get(
+        Uri.parse('$_apiUrl/messages/conversations'),
+        headers: _getAuthHeaders(),
       );
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as List;
-        conversations.value = data.map((c) => ConversationModel.fromJson(c)).toList();
+      if (resp.statusCode == 200) {
+        final List data = jsonDecode(resp.body);
+        conversations.value =
+            data.map((e) => ConversationModel.fromJson(e)).toList();
       }
+      await fetchUnreadCount();
     } catch (e) {
-      // silently fail — empty list shown
+      debugPrint('Error fetchConversations: $e');
     } finally {
       isLoading.value = false;
     }
   }
 
-  /// Load messages for one offer (REST)
+  Future<void> fetchUnreadCount() async {
+    if (_auth.authToken.value.isEmpty) return;
+    try {
+      final resp = await http.get(
+        Uri.parse('$_apiUrl/messages/unread/count'),
+        headers: _getAuthHeaders(),
+      );
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body);
+        unreadCount.value = data['unreadCount'] ?? 0;
+      }
+    } catch (e) {
+      debugPrint('Error fetchUnreadCount: $e');
+    }
+  }
+
   Future<void> loadMessages(String offerId) async {
-    await fetchChatHistory(offerId);
-  }
-
-  /// Connect WebSocket for one offer (simple alias)
-  Future<void> connectWebSocket(String offerId) async {
+    if (_auth.authToken.value.isEmpty) return;
+    isLoading.value = true;
     try {
-      _channel = WebSocketChannel.connect(Uri.parse('$WS_URL/socket.io/?transport=websocket'));
-      channel = _channel!;
-      isConnected.value = true;
-
-      channel.sink.add(jsonEncode({
-        'event': 'join-offer',
-        'data': {'offerId': offerId},
-      }));
-
-      channel.stream.listen((dynamic msg) {
-        final data = jsonDecode(msg);
-        _handleWebSocketMessage(data, '');
-      }, onDone: () {
-        isConnected.value = false;
-      }, onError: (_) {
-        isConnected.value = false;
-      });
+      final resp = await http.get(
+        Uri.parse('$_apiUrl/messages/offer/$offerId?page=1&limit=50'),
+        headers: _getAuthHeaders(),
+      );
+      if (resp.statusCode == 200) {
+        final List data = jsonDecode(resp.body);
+        messages.value = data
+            .map((e) => ChatMessage.fromJson(e, _currentUserId))
+            .toList();
+      }
+      await markOfferRead(offerId);
     } catch (e) {
-      isConnected.value = false;
+      debugPrint('Error loadMessages: $e');
+    } finally {
+      isLoading.value = false;
     }
   }
 
-  /// Disconnect WebSocket
-  void disconnectWebSocket() {
+  Future<void> markOfferRead(String offerId) async {
+    if (_auth.authToken.value.isEmpty) return;
     try {
-      _channel?.sink.close();
+      await http.patch(
+        Uri.parse('$_apiUrl/messages/offer/$offerId/read'),
+        headers: _getAuthHeaders(),
+      );
+      await fetchUnreadCount();
     } catch (_) {}
-    isConnected.value = false;
   }
 
-  /**
-   * Connect to WebSocket and join offer chat room
-   */
-  Future<void> connectToChat(String offerId, String userId, String userName) async {
+  void connectWebSocket(String offerId) {
+    final token = _auth.authToken.value;
+    if (token.isEmpty) return;
+
+    disconnectWebSocket();
+    _activeOfferId = offerId;
+
     try {
-      // Connect to WebSocket
-      channel = WebSocketChannel.connect(Uri.parse('$WS_URL/socket.io/?transport=websocket'));
-      isConnected.value = true;
+      final socket = io.io(
+        _apiUrl,
+        io.OptionBuilder()
+            .setTransports(['websocket', 'polling'])
+            .setAuth({'token': token})
+            .disableAutoConnect()
+            .build(),
+      );
 
-      // Join offer room
-      channel.sink.add(jsonEncode({
-        'event': 'join-offer',
-        'data': {
-          'userId': userId,
-          'offerId': offerId,
-          'userName': userName,
-        },
-      }));
+      socket.onConnect((_) {
+        isConnected.value = true;
+        socket.emit('join-offer', {'offerId': offerId});
+        socket.emit('mark-read', {'offerId': offerId});
+      });
 
-      // Listen for messages
-      channel.stream.listen((dynamic msg) {
-        final data = jsonDecode(msg);
-        _handleWebSocketMessage(data, userId);
-      }, onDone: () {
-        isConnected.value = false;
-      }, onError: (error) {
-        errorMessage.value = 'Connection error: $error';
+      socket.onDisconnect((_) {
         isConnected.value = false;
       });
 
-      // Fetch chat history
-      await fetchChatHistory(offerId);
+      socket.on('chat-history', (data) {
+        if (data is List) {
+          messages.value = data
+              .map((e) => ChatMessage.fromJson(
+                  Map<String, dynamic>.from(e), _currentUserId))
+              .toList();
+        }
+      });
+
+      socket.on('message', (data) {
+        if (data is Map) {
+          final msg = ChatMessage.fromJson(
+              Map<String, dynamic>.from(data), _currentUserId);
+          if (!messages.any((m) => m.id == msg.id && msg.id.isNotEmpty)) {
+            messages.add(msg);
+          }
+          if (!msg.isOwn) {
+            socket.emit('mark-read', {'offerId': offerId});
+          }
+        }
+      });
+
+      socket.on('users-typing', (data) {
+        if (data is Map && data['typingUsers'] is List) {
+          typingUsers.value = List<String>.from(data['typingUsers'])
+              .where((u) => u != _currentUserId)
+              .toList();
+        }
+      });
+
+      socket.connect();
+      _socket = socket;
     } catch (e) {
-      errorMessage.value = 'Failed to connect: $e';
-      Get.snackbar('Error', errorMessage.value);
+      debugPrint('Socket connect error: $e');
     }
   }
 
-  /**
-   * Send a message via WebSocket (2-arg variant used by chat_screen.dart)
-   */
-  Future<void> sendMessage(String offerId, String content, [String? userId]) async {
-    if (!isConnected.value) {
-      Get.snackbar('Erreur', 'Non connecté au chat');
+  void setTyping(String offerId, bool isTyping) {
+    if (_socket != null && isConnected.value) {
+      _socket!.emit('typing', {'offerId': offerId, 'isTyping': isTyping});
+      _typingTimer?.cancel();
+      if (isTyping) {
+        _typingTimer = Timer(const Duration(seconds: 3), () {
+          _socket?.emit('typing', {'offerId': offerId, 'isTyping': false});
+        });
+      }
+    }
+  }
+
+  Future<void> sendMessage(String offerId, String content) async {
+    final trimmed = content.trim();
+    if (trimmed.isEmpty) return;
+
+    if (_socket != null && isConnected.value) {
+      _socket!.emit('send-message', {'offerId': offerId, 'content': trimmed});
       return;
     }
 
+    // REST fallback when socket isn't connected
     try {
-      channel.sink.add(jsonEncode({
-        'event': 'send-message',
-        'data': {
-          'userId': userId ?? '',
-          'offerId': offerId,
-          'content': content,
-        },
-      }));
-    } catch (e) {
-      Get.snackbar('Erreur', 'Impossible d\'envoyer le message');
-    }
-  }
-
-  /**
-   * Handle incoming WebSocket messages
-   */
-  void _handleWebSocketMessage(Map<String, dynamic> data, String currentUserId) {
-    final event = data['event'];
-    final messageData = data['data'];
-
-    switch (event) {
-      case 'chat-history':
-        // Initial chat history
-        final historyList = messageData as List;
-        messages.value = historyList
-            .map((m) => ChatMessage.fromJson(m, currentUserId))
-            .toList();
-        break;
-
-      case 'message':
-        // New message received
-        final msg = ChatMessage(
-          id: messageData['id'],
-          senderId: messageData['senderId'],
-          senderName: messageData['senderName'],
-          content: messageData['content'],
-          timestamp: DateTime.parse(messageData['timestamp']),
-          isOwn: messageData['senderId'] == currentUserId,
-        );
-        messages.add(msg);
-        break;
-
-      case 'users-typing':
-        // Update typing indicator
-        final typing = List<String>.from(messageData['typingUsers'] ?? []);
-        typingUsers.value = typing;
-        break;
-
-      case 'error':
-        errorMessage.value = messageData['message'] ?? 'Error';
-        break;
-    }
-  }
-
-  /**
-   * Fetch chat history (REST API fallback)
-   */
-  Future<void> fetchChatHistory(String offerId) async {
-    try {
-      final response = await client.get(
-        Uri.parse('$API_URL/messages/offer/$offerId'),
+      final resp = await http.post(
+        Uri.parse('$_apiUrl/messages/offer/$offerId'),
+        headers: _getAuthHeaders(),
+        body: jsonEncode({'content': trimmed}),
       );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as List;
-        messages.value = data.map((m) => ChatMessage.fromJson(m, '')).toList();
+      if (resp.statusCode == 200 || resp.statusCode == 201) {
+        final data = jsonDecode(resp.body);
+        final msg = ChatMessage.fromJson(data, _currentUserId);
+        if (!messages.any((m) => m.id == msg.id)) {
+          messages.add(msg);
+        }
       }
     } catch (e) {
-      print('Error fetching chat history: $e');
+      debugPrint('Error sendMessage REST fallback: $e');
     }
   }
 
-  /**
-   * Send typing indicator
-   */
-  void sendTypingIndicator(String offerId, String userId, bool isTyping) {
-    if (!isConnected.value) return;
-
-    try {
-      channel.sink.add(jsonEncode({
-        'event': 'typing',
-        'data': {
-          'userId': userId,
-          'offerId': offerId,
-          'isTyping': isTyping,
-        },
-      }));
-    } catch (e) {
-      print('Error sending typing indicator: $e');
-    }
-  }
-
-  /**
-   * Fetch unread message count
-   */
-  Future<void> fetchUnreadCount(String userId) async {
-    try {
-      final response = await client.get(
-        Uri.parse('$API_URL/messages/unread/count?userId=$userId'),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        unreadCount.value = data['unreadCount'];
+  void disconnectWebSocket() {
+    _typingTimer?.cancel();
+    if (_socket != null) {
+      if (_activeOfferId != null) {
+        _socket!.emit('leave-offer', {'offerId': _activeOfferId});
       }
-    } catch (e) {
-      print('Error fetching unread count: $e');
+      _socket!.dispose();
+      _socket = null;
     }
-  }
-
-  /**
-   * Leave chat room
-   */
-  Future<void> leaveChat(String offerId, String userId) async {
-    try {
-      channel.sink.add(jsonEncode({
-        'event': 'leave-offer',
-        'data': {
-          'userId': userId,
-          'offerId': offerId,
-        },
-      }));
-      channel.sink.close();
-      isConnected.value = false;
-    } catch (e) {
-      print('Error leaving chat: $e');
-    }
+    _activeOfferId = null;
+    isConnected.value = false;
+    typingUsers.clear();
   }
 
   @override
   void onClose() {
-    // Close WebSocket on controller close
-    try {
-      channel.sink.close();
-    } catch (e) {
-      print('Error closing WebSocket: $e');
-    }
+    disconnectWebSocket();
     super.onClose();
-  }
-}
-
-// Chat Screen
-class ChatScreen extends StatefulWidget {
-  final String offerId;
-  final String otherUserName;
-  final String userId;
-  final String userName;
-
-  const ChatScreen({
-    required this.offerId,
-    required this.otherUserName,
-    required this.userId,
-    required this.userName,
-  });
-
-  @override
-  _ChatScreenState createState() => _ChatScreenState();
-}
-
-class _ChatScreenState extends State<ChatScreen> {
-  final ChatController controller = Get.find();
-  final messageController = TextEditingController();
-  final scrollController = ScrollController();
-  bool isTyping = false;
-
-  @override
-  void initState() {
-    super.initState();
-    controller.connectToChat(widget.offerId, widget.userId, widget.userName);
-  }
-
-  @override
-  void dispose() {
-    controller.leaveChat(widget.offerId, widget.userId);
-    messageController.dispose();
-    scrollController.dispose();
-    super.dispose();
-  }
-
-  void _scrollToBottom() {
-    if (scrollController.hasClients) {
-      scrollController.animateTo(
-        scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(widget.otherUserName),
-            Obx(
-              () => Text(
-                controller.isConnected.value ? 'Online' : 'Offline',
-                style: const TextStyle(fontSize: 12),
-              ),
-            ),
-          ],
-        ),
-        elevation: 0,
-      ),
-      body: Column(
-        children: [
-          // Messages list
-          Expanded(
-            child: Obx(
-              () => controller.isLoading.value
-                  ? const Center(child: CircularProgressIndicator())
-                  : ListView.builder(
-                      controller: scrollController,
-                      itemCount: controller.messages.length +
-                          (controller.typingUsers.isNotEmpty ? 1 : 0),
-                      itemBuilder: (context, index) {
-                        // Typing indicator at bottom
-                        if (index == controller.messages.length) {
-                          return Padding(
-                            padding: const EdgeInsets.all(8),
-                            child: Text(
-                              '${controller.typingUsers.join(", ")} is typing...',
-                              style: const TextStyle(
-                                fontStyle: FontStyle.italic,
-                                color: Colors.grey,
-                              ),
-                            ),
-                          );
-                        }
-
-                        final msg = controller.messages[index];
-                        return Align(
-                          alignment: msg.isOwn
-                              ? Alignment.centerRight
-                              : Alignment.centerLeft,
-                          child: Container(
-                            margin: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 4,
-                            ),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: msg.isOwn
-                                  ? Colors.purple[300]
-                                  : Colors.grey[300],
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: msg.isOwn
-                                  ? CrossAxisAlignment.end
-                                  : CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  msg.content,
-                                  style: const TextStyle(color: Colors.black),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  msg.timestamp.toString().substring(10, 16),
-                                  style: const TextStyle(
-                                    fontSize: 10,
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-            ),
-          ),
-          // Input area
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.grey[100],
-              border: Border(top: BorderSide(color: Colors.grey[300]!)),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: messageController,
-                    onChanged: (value) {
-                      final typing = value.isNotEmpty;
-                      if (typing != isTyping) {
-                        isTyping = typing;
-                        controller.sendTypingIndicator(
-                          widget.offerId,
-                          widget.userId,
-                          typing,
-                        );
-                      }
-                    },
-                    decoration: InputDecoration(
-                      hintText: 'Type a message...',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                FloatingActionButton(
-                  onPressed: () {
-                    if (messageController.text.isNotEmpty) {
-                      controller.sendMessage(
-                        widget.offerId,
-                        widget.userId,
-                        messageController.text,
-                      );
-                      messageController.clear();
-                      isTyping = false;
-                      _scrollToBottom();
-                    }
-                  },
-                  child: const Icon(Icons.send),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }
