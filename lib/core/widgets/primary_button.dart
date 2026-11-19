@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
+import '../theme/app_theme.dart';
 
 class PrimaryButton extends StatelessWidget {
   final String label;
@@ -19,13 +20,14 @@ class PrimaryButton extends StatelessWidget {
     this.isOutlined = false,
     this.backgroundColor,
     this.textColor,
-    this.height = 48,
+    this.height = 46,
     this.icon,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     if (isOutlined) {
+      final fg = textColor ?? AppColors.ink;
       return SizedBox(
         height: height,
         width: double.infinity,
@@ -33,8 +35,8 @@ class PrimaryButton extends StatelessWidget {
           onPressed: isLoading ? null : onPressed,
           style: OutlinedButton.styleFrom(
             side: BorderSide(
-              color: backgroundColor ?? AppColors.primary,
-              width: 1.5,
+              color: backgroundColor ?? AppColors.ink,
+              width: 1,
             ),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
@@ -42,28 +44,26 @@ class PrimaryButton extends StatelessWidget {
           ),
           child: isLoading
               ? SizedBox(
-                  height: 20,
-                  width: 20,
+                  height: 18,
+                  width: 18,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      textColor ?? AppColors.primary,
-                    ),
+                    valueColor: AlwaysStoppedAnimation<Color>(fg),
                   ),
                 )
               : Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     if (icon != null) ...[
-                      Icon(icon, size: 18, color: textColor ?? AppColors.primary),
+                      Icon(icon, size: 17, color: fg),
                       const SizedBox(width: 8),
                     ],
                     Text(
                       label,
-                      style: TextStyle(
-                        color: textColor ?? AppColors.primary,
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
+                      style: AppTypography.sans(
+                        size: 14,
+                        weight: FontWeight.w600,
+                        color: fg,
                       ),
                     ),
                   ],
@@ -72,41 +72,44 @@ class PrimaryButton extends StatelessWidget {
       );
     }
 
+    final bg = backgroundColor ?? AppColors.ink;
+    final fg = textColor ?? Colors.white;
     return SizedBox(
       height: height,
       width: double.infinity,
       child: ElevatedButton(
         onPressed: isLoading ? null : onPressed,
         style: ElevatedButton.styleFrom(
-          backgroundColor: backgroundColor ?? AppColors.accent,
-          foregroundColor: textColor ?? Colors.white,
+          backgroundColor: bg,
+          foregroundColor: fg,
+          disabledBackgroundColor: bg.withValues(alpha: 0.45),
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
         ),
         child: isLoading
-            ? const SizedBox(
-                height: 20,
-                width: 20,
+            ? SizedBox(
+                height: 18,
+                width: 18,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  valueColor: AlwaysStoppedAnimation<Color>(fg),
                 ),
               )
             : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   if (icon != null) ...[
-                    Icon(icon, size: 18, color: textColor ?? Colors.white),
+                    Icon(icon, size: 17, color: fg),
                     const SizedBox(width: 8),
                   ],
                   Text(
                     label,
-                    style: TextStyle(
-                      color: textColor ?? Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
+                    style: AppTypography.sans(
+                      size: 14,
+                      weight: FontWeight.w600,
+                      color: fg,
                     ),
                   ),
                 ],

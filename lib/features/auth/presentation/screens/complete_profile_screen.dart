@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../../controllers/auth_controller.dart';
+import '../../../../controllers/listings_controller.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/primary_button.dart';
 
 class CompleteProfileScreen extends StatefulWidget {
@@ -13,10 +15,11 @@ class CompleteProfileScreen extends StatefulWidget {
 
 class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
   final AuthController _authController = Get.find<AuthController>();
+  final ListingsController _listingsController = Get.find<ListingsController>();
   final _nameController = TextEditingController();
   String _selectedCity = 'Meknès';
 
-  final List<String> _cities = const [
+  final List<String> _fallbackCities = const [
     'Meknès',
     'Fès',
     'Rabat',
@@ -25,7 +28,17 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
     'Tanger',
     'Agadir',
     'Oujda',
+    'Kénitra',
+    'Tétouan',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    if (_listingsController.cities.isEmpty) {
+      _listingsController.fetchCities();
+    }
+  }
 
   @override
   void dispose() {
@@ -34,49 +47,66 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
   }
 
   void _showCityPicker() {
+    final cityNames = _listingsController.cities.isNotEmpty
+        ? _listingsController.cities.map((c) => c.name).toList()
+        : _fallbackCities;
+
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      backgroundColor: AppColors.paper,
       builder: (ctx) {
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Choisir votre ville',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 12),
-              ..._cities.map((city) {
-                final isSelected = city == _selectedCity;
-                return ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(
-                    city,
-                    style: TextStyle(
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                      color: isSelected ? AppColors.primary : AppColors.textPrimary,
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppColors.borderStrong,
+                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
-                  trailing: isSelected
-                      ? const Icon(Icons.check, color: AppColors.primary)
-                      : null,
-                  onTap: () {
-                    setState(() => _selectedCity = city);
-                    _authController.selectedCity.value = city;
-                    Navigator.pop(ctx);
-                  },
-                );
-              }).toList(),
-            ],
+                ),
+                const SizedBox(height: 16),
+                Text('Votre ville', style: AppTypography.serif(size: 22)),
+                const SizedBox(height: 10),
+                const Divider(),
+                Flexible(
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: cityNames.length,
+                    separatorBuilder: (_, __) => const Divider(),
+                    itemBuilder: (_, idx) {
+                      final city = cityNames[idx];
+                      final isSelected = city == _selectedCity;
+                      return ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(
+                          city,
+                          style: AppTypography.sans(
+                            size: 14,
+                            weight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                          ),
+                        ),
+                        trailing: isSelected
+                            ? const Icon(Icons.check_rounded, size: 18, color: AppColors.accent)
+                            : null,
+                        onTap: () {
+                          setState(() => _selectedCity = city);
+                          _authController.selectedCity.value = city;
+                          Navigator.pop(ctx);
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -85,8 +115,8 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
 
   void _submit() {
     final name = _nameController.text.trim();
-    if (name.isEmpty) {
-      Get.snackbar('Attention', 'Veuillez renseigner votre nom d\'affichage');
+    if (name.length < 2) {
+      Get.snackbar('Attention', 'Entrez un nom d\'affichage (au moins 2 caractères).');
       return;
     }
     _authController.userName.value = name;
@@ -97,115 +127,78 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.paper,
       appBar: AppBar(
-        title: const Text('3 / 3'),
         automaticallyImplyLeading: false,
+        title: Text(
+          'Étape 3 sur 3',
+          style: AppTypography.sans(size: 12.5, color: AppColors.textSecondary),
+        ),
+        centerTitle: true,
       ),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(20.0),
+          padding: const EdgeInsets.fromLTRB(24, 6, 24, 24),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 12),
-              // Avatar selector
-              Stack(
-                alignment: Alignment.bottomRight,
-                children: [
-                  Container(
-                    width: 96,
-                    height: 96,
-                    decoration: BoxDecoration(
-                      color: AppColors.divider,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.primary, width: 2),
-                    ),
-                    child: const Icon(
-                      Icons.person_rounded,
-                      size: 54,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: const BoxDecoration(
-                      color: AppColors.accent,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.camera_alt, color: Colors.white, size: 16),
-                  ),
-                ],
+              ClipRRect(
+                borderRadius: BorderRadius.circular(2),
+                child: const LinearProgressIndicator(
+                  value: 1.0,
+                  minHeight: 3,
+                  backgroundColor: AppColors.line,
+                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.ink),
+                ),
               ),
-              const SizedBox(height: 24),
-              const Text(
-                'Finalisez votre profil',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+              const SizedBox(height: 32),
+              Text('Présentez-vous', style: AppTypography.serif(size: 28)),
+              const SizedBox(height: 8),
+              Text(
+                'Ces informations apparaîtront sur vos annonces et dans vos conversations.',
+                style: AppTypography.sans(size: 13.5, color: AppColors.textSecondary, height: 1.5),
+              ),
+              const SizedBox(height: 28),
+              Text(
+                'Nom d\'affichage',
+                style: AppTypography.sans(
+                  size: 12.5,
+                  weight: FontWeight.w500,
+                  color: AppColors.textSecondary,
                 ),
               ),
               const SizedBox(height: 6),
-              const Text(
-                'Ces informations seront visibles par vos partenaires d\'échange.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-              ),
-              const SizedBox(height: 28),
-              // Display name input
               TextField(
                 controller: _nameController,
-                decoration: InputDecoration(
-                  labelText: 'Nom d\'affichage *',
-                  hintText: 'ex. Salma E.',
-                  filled: true,
-                  fillColor: AppColors.surface,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.border),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.border),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.primary, width: 2),
-                  ),
+                textCapitalization: TextCapitalization.words,
+                decoration: const InputDecoration(hintText: 'ex. Salma El Idrissi'),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                'Ville principale',
+                style: AppTypography.sans(
+                  size: 12.5,
+                  weight: FontWeight.w500,
+                  color: AppColors.textSecondary,
                 ),
               ),
-              const SizedBox(height: 16),
-              // City Picker
+              const SizedBox(height: 6),
               InkWell(
                 onTap: _showCityPicker,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(10),
                 child: Container(
-                  height: 52,
+                  height: 48,
                   padding: const EdgeInsets.symmetric(horizontal: 14),
                   decoration: BoxDecoration(
                     color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.border),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.line),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.location_on_outlined, color: AppColors.primary, size: 20),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Ville : $_selectedCity',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: AppColors.textHint),
+                      Text(_selectedCity, style: AppTypography.sans(size: 14)),
+                      const Icon(Icons.chevron_right_rounded, color: AppColors.textHint),
                     ],
                   ),
                 ),

@@ -24,6 +24,8 @@ dependencies:
   firebase_core: ^2.24.0 # Firebase
   firebase_messaging: ^14.6.0 # Push notifications
   web_socket_channel: ^2.4.0 # WebSocket for real-time chat
+  socket_io_client: ^3.0.2 # Socket.IO client matching NestJS gateway
+  google_fonts: ^6.2.1 # Editorial typography (Newsreader + Inter)
 
 dev_dependencies:
   flutter_test:
