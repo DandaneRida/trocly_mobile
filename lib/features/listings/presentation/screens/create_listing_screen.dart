@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
@@ -23,6 +24,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
 
   // Photos
   final List<String> _uploadedPhotoUrls = [];
+  final List<Uint8List> _previewBytes = [];
   bool _isUploadingPhoto = false;
 
   // Form controllers
@@ -88,14 +90,23 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
 
       if (picked != null) {
         setState(() => _isUploadingPhoto = true);
+        final bytes = await picked.readAsBytes();
         final url = await _listingsController.uploadImage(picked);
         if (url != null) {
           setState(() {
             _uploadedPhotoUrls.add(url);
+            _previewBytes.add(bytes);
           });
           Get.snackbar('Photo ajoutée', 'Photo téléchargée avec succès');
         } else {
-          Get.snackbar('Erreur', 'Échec du téléchargement de la photo');
+          Get.snackbar(
+            'Erreur',
+            _listingsController.errorMessage.value.isNotEmpty
+                ? _listingsController.errorMessage.value
+                : 'Échec du téléchargement de la photo (Assurez-vous que le backend tourne sur le port 3000)',
+            backgroundColor: Colors.red,
+            colorText: Colors.white,
+          );
         }
       }
     } catch (e) {
@@ -108,6 +119,9 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
   void _removePhoto(int index) {
     setState(() {
       _uploadedPhotoUrls.removeAt(index);
+      if (index < _previewBytes.length) {
+        _previewBytes.removeAt(index);
+      }
     });
   }
 
@@ -237,7 +251,6 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
 
   // 1. Photos
   Widget _step1Photos() {
-    final baseUrl = apiUrl;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -259,8 +272,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
           children: [
             ..._uploadedPhotoUrls.asMap().entries.map((entry) {
               final index = entry.key;
-              final path = entry.value;
-              final fullUrl = path.startsWith('http') ? path : '$baseUrl$path';
+              final hasBytes = index < _previewBytes.length;
               return Stack(
                 children: [
                   Container(
@@ -269,11 +281,16 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: AppColors.border),
-                      image: DecorationImage(
-                        image: NetworkImage(fullUrl),
-                        fit: BoxFit.cover,
-                      ),
+                      image: hasBytes
+                          ? DecorationImage(
+                              image: MemoryImage(_previewBytes[index]),
+                              fit: BoxFit.cover,
+                            )
+                          : null,
                     ),
+                    child: !hasBytes
+                        ? const Center(child: Icon(Icons.image, color: AppColors.primary))
+                        : null,
                   ),
                   Positioned(
                     top: 4,
@@ -357,7 +374,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
               ),
               SizedBox(height: 8),
               Text(
-                '• Prenez l\'objet sous une bonne lumière naturelle\n• Montrez les détails et les éventuelles marques d\'usure\n• Évitez les photos floues ou trop sombres',
+                '• Formats acceptés : JPEG, PNG, WebP (max 5 Mo)\n• Prenez l\'objet sous une bonne lumière naturelle\n• Montrez les détails et marques d\'usure',
                 style: TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.4),
               ),
             ],
