@@ -9,11 +9,13 @@ import 'controllers/chat_controller.dart';
 import 'controllers/meeting_controller.dart';
 import 'controllers/reviews_controller.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Initialize global GetX controllers
-  Get.put<AuthController>(AuthController(), permanent: true);
+  final authController = Get.put<AuthController>(AuthController(), permanent: true);
+  await authController.loadStoredToken();
+
   Get.put<ListingsController>(ListingsController(), permanent: true);
   Get.put<OffersController>(OffersController(), permanent: true);
   Get.put<ChatController>(ChatController(), permanent: true);

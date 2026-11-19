@@ -146,6 +146,18 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
   }
 
   void _publish() async {
+    final token = _authController.authToken.value;
+    if (token.isEmpty) {
+      Get.snackbar(
+        'Connexion requise',
+        'Veuillez vous connecter pour pouvoir publier une annonce',
+        backgroundColor: Colors.orange,
+        colorText: Colors.white,
+      );
+      Get.toNamed('/login');
+      return;
+    }
+
     final success = await _listingsController.publishListingEnhanced(
       title: _titleController.text.trim(),
       description: _descController.text.trim(),
