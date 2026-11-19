@@ -1,7 +1,11 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import '../../../../core/network/api_client.dart';
+import 'package:http/http.dart' as http;
+import '../../../../controllers/auth_controller.dart';
+import '../../../../core/constants/api_constants.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/primary_button.dart';
 
 class ReportScreen extends StatefulWidget {
@@ -13,14 +17,16 @@ class ReportScreen extends StatefulWidget {
 
 class _ReportScreenState extends State<ReportScreen> {
   final _detailsController = TextEditingController();
-  String _selectedReason = 'misleading';
+  final AuthController _auth = Get.find<AuthController>();
+  String _selectedReason = 'fraud';
   bool _isSubmitting = false;
 
-  final Map<String, String> _reasons = {
-    'misleading': 'Annonce trompeuse ou inexacte',
-    'forbidden_item': 'Objet interdit ou dangereux',
+  final Map<String, String> _reasons = const {
     'fraud': 'Suspicion de fraude ou arnaque',
-    'inappropriate': 'Contenu inapproprié ou offensant',
+    'fake_listing': 'Annonce trompeuse ou inexacte',
+    'inappropriate_content': 'Contenu inapproprié ou interdit',
+    'harassment': 'Comportement abusif ou harcèlement',
+    'no_show': 'Absence au rendez-vous convenu',
     'other': 'Autre raison',
   };
 
@@ -30,21 +36,38 @@ class _ReportScreenState extends State<ReportScreen> {
     super.dispose();
   }
 
-  void _submit() async {
+  Future<void> _submit() async {
+    if (_isSubmitting) return;
     setState(() => _isSubmitting = true);
-    final listingId = (Get.arguments as Map<String, dynamic>?)?['listingId'];
+
+    final args = Get.arguments is Map ? Map<String, dynamic>.from(Get.arguments) : {};
+    final listingId = args['listingId']?.toString();
+    final userId = args['userId']?.toString();
 
     try {
-      await ApiClient().post('/reports', body: {
-        if (listingId != null) 'targetListingId': listingId,
-        'reason': _selectedReason,
-        'details': _detailsController.text.trim(),
-      });
-      Get.back();
-      Get.snackbar('Signalement reçu', 'Merci, notre équipe de modération va examiner cette situation.');
+      final resp = await http.post(
+        Uri.parse('${ApiConstants.baseUrl}/reports'),
+        headers: {
+          'Content-Type': 'application/json',
+          if (_auth.authToken.value.isNotEmpty)
+            'Authorization': 'Bearer ${_auth.authToken.value}',
+        },
+        body: jsonEncode({
+          if (listingId != null && listingId.isNotEmpty) 'reportedListingId': listingId,
+          if (userId != null && userId.isNotEmpty) 'reportedUserId': userId,
+          'reportType': _selectedReason,
+          'description': _detailsController.text.trim(),
+        }),
+      );
+      if (resp.statusCode == 200 || resp.statusCode == 201) {
+        Get.back();
+        Get.snackbar('Signalement envoyé', 'Merci, l\'équipe de modération va l\'examiner.');
+      } else {
+        final err = jsonDecode(resp.body);
+        Get.snackbar('Erreur', err['message']?.toString() ?? 'Impossible d\'envoyer le signalement');
+      }
     } catch (e) {
-      Get.back();
-      Get.snackbar('Signalement reçu', 'Votre signalement a été enregistré.');
+      Get.snackbar('Erreur réseau', 'Impossible de contacter le serveur.');
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -53,78 +76,119 @@ class _ReportScreenState extends State<ReportScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.paper,
       appBar: AppBar(
-        title: const Text('Signaler'),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.close_rounded),
           onPressed: () => Get.back(),
         ),
+        title: Text('Signaler', style: AppTypography.sans(size: 16, weight: FontWeight.w600)),
+        bottom: const PreferredSize(
+          preferredSize: Size.fromHeight(1),
+          child: Divider(height: 1),
+        ),
       ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Pourquoi signalez-vous cette annonce ?',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'Votre signalement reste strictement anonyme et confidentiel.',
-                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-              ),
-              const SizedBox(height: 20),
-              // Reasons radio list
-              ..._reasons.entries.map((entry) {
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: _selectedReason == entry.key ? AppColors.primary : AppColors.border,
-                      width: _selectedReason == entry.key ? 1.5 : 1,
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Quel est le problème ?', style: AppTypography.serif(size: 25)),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Votre signalement est confidentiel et examiné par la modération.',
+                    style: AppTypography.sans(size: 13, color: AppColors.textSecondary),
+                  ),
+                  const SizedBox(height: 20),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppColors.line),
+                    ),
+                    child: Column(
+                      children: _reasons.entries.map((entry) {
+                        final selected = entry.key == _selectedReason;
+                        final isLast = entry.key == _reasons.keys.last;
+                        return Column(
+                          children: [
+                            InkWell(
+                              onTap: () => setState(() => _selectedReason = entry.key),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 18,
+                                      height: 18,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: selected ? AppColors.ink : AppColors.borderStrong,
+                                          width: selected ? 5.5 : 1.4,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        entry.value,
+                                        style: AppTypography.sans(
+                                          size: 13.5,
+                                          weight: selected ? FontWeight.w600 : FontWeight.w400,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            if (!isLast) const Divider(),
+                          ],
+                        );
+                      }).toList(),
                     ),
                   ),
-                  child: RadioListTile<String>(
-                    value: entry.key,
-                    groupValue: _selectedReason,
-                    activeColor: AppColors.primary,
-                    title: Text(
-                      entry.value,
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Précisions (facultatif)',
+                    style: AppTypography.sans(
+                      size: 12.5,
+                      weight: FontWeight.w500,
+                      color: AppColors.textSecondary,
                     ),
-                    onChanged: (val) {
-                      if (val != null) setState(() => _selectedReason = val);
-                    },
                   ),
-                );
-              }).toList(),
-              const SizedBox(height: 16),
-              // Details input
-              TextField(
-                controller: _detailsController,
-                maxLines: 3,
-                decoration: InputDecoration(
-                  labelText: 'Détails complémentaires (optionnel)',
-                  hintText: 'Expliquez ce qui vous semble anormal...',
-                  filled: true,
-                  fillColor: AppColors.surface,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _detailsController,
+                    maxLines: 3,
+                    decoration: const InputDecoration(
+                      hintText: 'Décrivez brièvement la situation…',
+                    ),
+                  ),
+                ],
               ),
-              const Spacer(),
-              PrimaryButton(
+            ),
+          ),
+          Container(
+            decoration: const BoxDecoration(
+              color: AppColors.paper,
+              border: Border(top: BorderSide(color: AppColors.line)),
+            ),
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+            child: SafeArea(
+              top: false,
+              child: PrimaryButton(
                 label: 'Envoyer le signalement',
                 isLoading: _isSubmitting,
                 onPressed: _submit,
               ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
