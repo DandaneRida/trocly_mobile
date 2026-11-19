@@ -239,6 +239,7 @@ class ListingsController extends GetxController {
   /// Story A1 / B4 - Récupération filtrée du feed
   Future<void> fetchListings({
     int? cityId,
+    bool allCities = false,
     String? category,
     String? condition,
     double? minValue,
@@ -256,8 +257,12 @@ class ListingsController extends GetxController {
         'limit': limit.toString(),
       };
 
-      final effectiveCityId = cityId ?? selectedCityId.value;
-      if (effectiveCityId != null) queryParams['cityId'] = effectiveCityId.toString();
+      if (!allCities) {
+        final effectiveCityId = cityId ?? selectedCityId.value;
+        if (effectiveCityId != null) {
+          queryParams['cityId'] = effectiveCityId.toString();
+        }
+      }
 
       final effectiveCategory = category ?? (selectedCategory.value.isNotEmpty ? selectedCategory.value : null);
       if (effectiveCategory != null && effectiveCategory.isNotEmpty && effectiveCategory != 'Tous') {

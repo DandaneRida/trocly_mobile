@@ -44,6 +44,9 @@ class _FeedScreenState extends State<FeedScreen> {
   }
 
   void _showCityPicker() {
+    if (_listingsController.cities.isEmpty) {
+      _listingsController.fetchCities();
+    }
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.paper,
@@ -77,10 +80,27 @@ class _FeedScreenState extends State<FeedScreen> {
                   const SizedBox(height: 14),
                   const Divider(),
                   if (cities.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.all(24),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 24),
                       child: Center(
-                        child: CircularProgressIndicator(color: AppColors.ink, strokeWidth: 2),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const CircularProgressIndicator(color: AppColors.ink, strokeWidth: 2),
+                            const SizedBox(height: 12),
+                            TextButton(
+                              onPressed: () => _listingsController.fetchCities(),
+                              child: Text(
+                                'Réessayer',
+                                style: AppTypography.sans(
+                                  size: 13,
+                                  weight: FontWeight.w600,
+                                  color: AppColors.accent,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     )
                   else

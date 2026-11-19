@@ -45,14 +45,17 @@ class _SearchScreenState extends State<SearchScreen> {
   void initState() {
     super.initState();
     _selectedCity = _listingsController.selectedCity.value;
-    if (_listingsController.cities.isEmpty) {
-      _listingsController.fetchCities();
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_listingsController.cities.isEmpty) {
+        _listingsController.fetchCities();
+      }
+    });
   }
 
   void _applyFilters() {
+    final allCities = _selectedCity == 'Toutes';
     int? cityId;
-    if (_selectedCity != null) {
+    if (!allCities && _selectedCity != null) {
       final found = _listingsController.cities.firstWhereOrNull((c) => c.name == _selectedCity);
       if (found != null) cityId = found.id;
     }
@@ -62,6 +65,7 @@ class _SearchScreenState extends State<SearchScreen> {
       category: (_selectedCategory == null || _selectedCategory == 'Tous') ? null : _selectedCategory,
       condition: _selectedCondition,
       cityId: cityId,
+      allCities: allCities,
     );
   }
 
@@ -126,14 +130,20 @@ class _SearchScreenState extends State<SearchScreen> {
                       // Ville
                       Obx(() {
                         final cities = _listingsController.cities;
+                        final cityNames = ['Toutes', ...cities.map((c) => c.name)];
+                        final currentVal =
+                            cityNames.contains(_selectedCity) ? _selectedCity : null;
                         return _filterDropdown<String>(
-                          value: cities.any((c) => c.name == _selectedCity) ? _selectedCity : null,
+                          value: currentVal,
                           hint: 'Ville',
-                          items: cities
-                              .map((c) => DropdownMenuItem(value: c.name, child: Text(c.name)))
+                          items: cityNames
+                              .map((name) => DropdownMenuItem(value: name, child: Text(name)))
                               .toList(),
                           onChanged: (v) {
                             setState(() => _selectedCity = v);
+                            if (v != null && v != 'Toutes') {
+                              _listingsController.changeCity(v);
+                            }
                             _applyFilters();
                           },
                         );
@@ -220,7 +230,7 @@ class _SearchScreenState extends State<SearchScreen> {
     required List<DropdownMenuItem<T>> items,
     required ValueChanged<T?> onChanged,
   }) {
-    final active = value != null && value != 'Tous';
+    final active = value != null && value != 'Tous' && value != 'Toutes';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
