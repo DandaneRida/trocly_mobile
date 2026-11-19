@@ -2,9 +2,10 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
-import '../../../../controllers/listings_controller.dart';
 import '../../../../controllers/auth_controller.dart';
+import '../../../../controllers/listings_controller.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/primary_button.dart';
 
 class CreateListingScreen extends StatefulWidget {
@@ -20,8 +21,9 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
   final ImagePicker _picker = ImagePicker();
 
   int _step = 1;
-  final int _totalSteps = 6;
+  final int _totalSteps = 4;
   bool _isPublishing = false;
+  String? _duplicateError;
 
   // Photos
   final List<String> _uploadedPhotoUrls = [];
@@ -32,16 +34,11 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
   final _titleController = TextEditingController();
   final _descController = TextEditingController();
   final _wishController = TextEditingController();
+  final _brandController = TextEditingController();
 
   String _selectedCategory = 'Électronique';
-  String _selectedCondition = 'bon';
+  String _selectedCondition = 'tres_bon';
   String _selectedCity = 'Meknès';
-
-  // Dynamic attributes (JSONB)
-  final Map<String, String> _attributes = {
-    'marque': '',
-    'modele': '',
-  };
 
   final List<String> _categories = const [
     'Électronique',
@@ -53,18 +50,43 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
     'Bricolage',
   ];
 
-  final List<String> _conditions = const [
-    'neuf',
-    'comme_neuf',
-    'tres_bon',
-    'bon',
-    'use',
+  final List<Map<String, String>> _conditionOptions = const [
+    {
+      'key': 'neuf',
+      'label': 'Neuf',
+      'desc': 'Jamais utilisé, encore dans son emballage ou avec étiquette',
+    },
+    {
+      'key': 'comme_neuf',
+      'label': 'Comme neuf',
+      'desc': 'Utilisé quelques fois, aucune trace visible',
+    },
+    {
+      'key': 'tres_bon',
+      'label': 'Très bon état',
+      'desc': 'Légères traces d\'usage, fonctionne parfaitement',
+    },
+    {
+      'key': 'bon',
+      'label': 'Bon état',
+      'desc': 'Signes d\'utilisation normaux, entièrement fonctionnel',
+    },
+    {
+      'key': 'use',
+      'label': 'Usé',
+      'desc': 'Marques visibles ou petits défauts à préciser',
+    },
   ];
 
   @override
   void initState() {
     super.initState();
-    _selectedCity = _authController.selectedCity.value;
+    _selectedCity = _authController.selectedCity.value.isNotEmpty
+        ? _authController.selectedCity.value
+        : _listingsController.selectedCity.value;
+    if (_listingsController.cities.isEmpty) {
+      _listingsController.fetchCities();
+    }
   }
 
   @override
@@ -72,12 +94,21 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
     _titleController.dispose();
     _descController.dispose();
     _wishController.dispose();
+    _brandController.dispose();
     super.dispose();
+  }
+
+  String _conditionLabel(String key) {
+    final found = _conditionOptions.firstWhere(
+      (c) => c['key'] == key,
+      orElse: () => {'label': key},
+    );
+    return found['label'] ?? key;
   }
 
   Future<void> _pickAndUploadImage({ImageSource source = ImageSource.gallery}) async {
     if (_uploadedPhotoUrls.length >= 5) {
-      Get.snackbar('Limite atteinte', 'Vous pouvez ajouter 5 photos au maximum.');
+      Get.snackbar('Limite atteinte', 'Maximum 5 photos par annonce.');
       return;
     }
 
@@ -88,7 +119,6 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
         maxHeight: 1200,
         imageQuality: 85,
       );
-
       if (picked != null) {
         setState(() => _isUploadingPhoto = true);
         final bytes = await picked.readAsBytes();
@@ -98,39 +128,35 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
             _uploadedPhotoUrls.add(url);
             _previewBytes.add(bytes);
           });
-          Get.snackbar('Photo ajoutée', 'Photo téléchargée avec succès');
         } else {
           Get.snackbar(
-            'Erreur',
+            'Échec de l\'envoi',
             _listingsController.errorMessage.value.isNotEmpty
                 ? _listingsController.errorMessage.value
-                : 'Échec du téléchargement de la photo (Assurez-vous que le backend tourne sur le port 3000)',
-            backgroundColor: Colors.red,
-            colorText: Colors.white,
+                : 'Impossible d\'envoyer la photo.',
           );
         }
       }
     } catch (e) {
-      Get.snackbar('Erreur', 'Impossible de sélectionner la photo: $e');
+      Get.snackbar('Erreur', 'Sélection impossible : $e');
     } finally {
-      setState(() => _isUploadingPhoto = false);
+      if (mounted) setState(() => _isUploadingPhoto = false);
     }
   }
 
   void _removePhoto(int index) {
     setState(() {
       _uploadedPhotoUrls.removeAt(index);
-      if (index < _previewBytes.length) {
-        _previewBytes.removeAt(index);
-      }
+      if (index < _previewBytes.length) _previewBytes.removeAt(index);
     });
   }
 
   void _nextStep() {
-    if (_step == 2 && _titleController.text.trim().isEmpty) {
-      Get.snackbar('Attention', 'Veuillez saisir un titre pour votre annonce');
+    if (_step == 2 && _titleController.text.trim().length < 3) {
+      setState(() => _duplicateError = 'Indiquez un titre d\'au moins 3 caractères.');
       return;
     }
+    setState(() => _duplicateError = null);
     if (_step < _totalSteps) {
       setState(() => _step++);
     } else {
@@ -146,24 +172,23 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
     }
   }
 
-  void _publish() async {
+  Future<void> _publish() async {
     if (_isPublishing) return;
 
     final token = _authController.authToken.value;
     if (token.isEmpty) {
-      Get.snackbar(
-        'Connexion requise',
-        'Veuillez vous connecter pour pouvoir publier une annonce',
-        backgroundColor: Colors.orange,
-        colorText: Colors.white,
-      );
+      Get.snackbar('Connexion requise', 'Connectez-vous pour publier une annonce.');
       Get.toNamed('/login');
       return;
     }
 
     setState(() => _isPublishing = true);
-
     try {
+      final attrs = <String, dynamic>{};
+      if (_brandController.text.trim().isNotEmpty) {
+        attrs['marque'] = _brandController.text.trim();
+      }
+
       final success = await _listingsController.publishListingEnhanced(
         title: _titleController.text.trim(),
         description: _descController.text.trim(),
@@ -172,12 +197,16 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
         estimatedValue: 0.0,
         city: _selectedCity,
         photos: _uploadedPhotoUrls,
-        attributes: _attributes,
+        attributes: attrs,
         wishes: _wishController.text.trim().isNotEmpty
-            ? [_wishController.text.trim()]
-            : ['Échange ouvert'],
+            ? _wishController.text
+                .split(',')
+                .map((s) => s.trim())
+                .where((s) => s.isNotEmpty)
+                .toList()
+            : ['Ouvert aux propositions'],
       );
-      if (success) {
+      if (success && mounted) {
         if (Navigator.of(context).canPop()) {
           Get.back(result: true);
         } else {
@@ -185,225 +214,192 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
         }
       }
     } finally {
-      if (mounted) {
-        setState(() => _isPublishing = false);
-      }
+      if (mounted) setState(() => _isPublishing = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.paper,
       appBar: AppBar(
-        title: Text('Nouvelle annonce · $_step/$_totalSteps'),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: Icon(_step == 1 ? Icons.close_rounded : Icons.arrow_back_ios_new_rounded, size: 20),
           onPressed: _prevStep,
         ),
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Linear Progress Indicator
-            LinearProgressIndicator(
-              value: _step / _totalSteps,
-              backgroundColor: AppColors.divider,
-              valueColor: const AlwaysStoppedAnimation<Color>(AppColors.accent),
-              minHeight: 4,
-            ),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20.0),
-                child: _buildStepContent(),
-              ),
-            ),
-            // Bottom Action buttons
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: const BoxDecoration(
-                color: AppColors.surface,
-                border: Border(top: BorderSide(color: AppColors.border)),
-              ),
-              child: Row(
-                children: [
-                  if (_step > 1) ...[
-                    Expanded(
-                      flex: 1,
-                      child: OutlinedButton(
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size(double.infinity, 50),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        child: const Text('Précédent'),
-                        onPressed: _prevStep,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                  ],
-                  Expanded(
-                    flex: 2,
-                    child: PrimaryButton(
-                      label: _step == _totalSteps ? 'Publier l\'annonce' : 'Continuer',
-                      isLoading: _isPublishing,
-                      onPressed: _isPublishing ? null : _nextStep,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+        title: Text(
+          'Étape $_step sur $_totalSteps',
+          style: AppTypography.sans(size: 12.5, color: AppColors.textSecondary),
         ),
+        centerTitle: true,
+      ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(2),
+              child: LinearProgressIndicator(
+                value: _step / _totalSteps,
+                minHeight: 3,
+                backgroundColor: AppColors.line,
+                valueColor: const AlwaysStoppedAnimation<Color>(AppColors.ink),
+              ),
+            ),
+          ),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 22, 20, 28),
+              child: _buildStep(),
+            ),
+          ),
+          Container(
+            decoration: const BoxDecoration(
+              color: AppColors.paper,
+              border: Border(top: BorderSide(color: AppColors.line)),
+            ),
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+            child: SafeArea(
+              top: false,
+              child: PrimaryButton(
+                label: _step == _totalSteps ? 'Publier l\'annonce' : 'Continuer',
+                isLoading: _isPublishing,
+                onPressed: _isPublishing ? null : _nextStep,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildStepContent() {
+  Widget _buildStep() {
     switch (_step) {
       case 1:
         return _step1Photos();
       case 2:
-        return _step2Infos();
+        return _step2CoreInfo();
       case 3:
-        return _step3Category();
-      case 4:
-        return _step4Attributes();
-      case 5:
-        return _step5Wishes();
-      case 6:
-        return _step6Summary();
+        return _step3DetailsAndWish();
       default:
-        return const SizedBox.shrink();
+        return _step4Review();
     }
   }
 
-  // 1. Photos
   Widget _step1Photos() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Ajoutez de belles photos',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-        ),
+        Text('Ajoutez des photos', style: AppTypography.serif(size: 26)),
         const SizedBox(height: 6),
-        const Text(
-          '1 à 5 photos pour mettre en valeur votre objet.',
-          style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+        Text(
+          'Des photos nettes à la lumière naturelle attirent davantage de propositions. Jusqu\'à 5 photos.',
+          style: AppTypography.sans(size: 13, color: AppColors.textSecondary, height: 1.45),
         ),
-        const SizedBox(height: 24),
-
-        // Grille de photos affichées
+        const SizedBox(height: 20),
         Wrap(
-          spacing: 12,
-          runSpacing: 12,
+          spacing: 10,
+          runSpacing: 10,
           children: [
-            ..._uploadedPhotoUrls.asMap().entries.map((entry) {
-              final index = entry.key;
-              final hasBytes = index < _previewBytes.length;
+            ...List.generate(_previewBytes.length, (i) {
               return Stack(
                 children: [
-                  Container(
-                    width: 100,
-                    height: 100,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.border),
-                      image: hasBytes
-                          ? DecorationImage(
-                              image: MemoryImage(_previewBytes[index]),
-                              fit: BoxFit.cover,
-                            )
-                          : null,
-                    ),
-                    child: !hasBytes
-                        ? const Center(child: Icon(Icons.image, color: AppColors.primary))
-                        : null,
-                  ),
-                  Positioned(
-                    top: 4,
-                    right: 4,
-                    child: GestureDetector(
-                      onTap: () => _removePhoto(index),
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(
-                          color: Colors.black54,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.close, size: 14, color: Colors.white),
-                      ),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.memory(
+                      _previewBytes[i],
+                      width: 98,
+                      height: 98,
+                      fit: BoxFit.cover,
                     ),
                   ),
-                  if (index == 0)
+                  if (i == 0)
                     Positioned(
-                      bottom: 4,
-                      left: 4,
+                      bottom: 5,
+                      left: 5,
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(6),
+                          color: AppColors.ink.withValues(alpha: 0.7),
+                          borderRadius: BorderRadius.circular(4),
                         ),
-                        child: const Text('Principale', style: TextStyle(color: Colors.white, fontSize: 9)),
+                        child: Text(
+                          'Couverture',
+                          style: AppTypography.sans(size: 9.5, weight: FontWeight.w600, color: Colors.white),
+                        ),
                       ),
                     ),
+                  Positioned(
+                    top: 4,
+                    right: 4,
+                    child: InkWell(
+                      onTap: () => _removePhoto(i),
+                      child: Container(
+                        width: 22,
+                        height: 22,
+                        decoration: const BoxDecoration(
+                          color: AppColors.ink,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.close_rounded, size: 13, color: Colors.white),
+                      ),
+                    ),
+                  ),
                 ],
               );
             }),
-
-            // Bouton Ajouter
             if (_uploadedPhotoUrls.length < 5)
-              GestureDetector(
+              InkWell(
                 onTap: _isUploadingPhoto ? null : () => _pickAndUploadImage(),
+                borderRadius: BorderRadius.circular(10),
                 child: Container(
-                  width: 100,
-                  height: 100,
+                  width: 98,
+                  height: 98,
                   decoration: BoxDecoration(
                     color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.border, style: BorderStyle.solid),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.borderStrong, width: 1.2),
                   ),
                   child: _isUploadingPhoto
                       ? const Center(
                           child: SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.ink),
                           ),
                         )
                       : Column(
                           mainAxisAlignment: MainAxisAlignment.center,
-                          children: const [
-                            Icon(Icons.add_a_photo_outlined, size: 28, color: AppColors.primary),
-                            SizedBox(height: 6),
-                            Text('+ Photo', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                          children: [
+                            const Icon(Icons.photo_camera_outlined, size: 24, color: AppColors.textSecondary),
+                            const SizedBox(height: 6),
+                            Text(
+                              '${_uploadedPhotoUrls.length} / 5',
+                              style: AppTypography.sans(size: 11.5, color: AppColors.textSecondary),
+                            ),
                           ],
                         ),
                 ),
               ),
           ],
         ),
-
         const SizedBox(height: 24),
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.border),
+            color: AppColors.accentLight,
+            borderRadius: BorderRadius.circular(10),
           ),
-          child: Column(
+          child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
-              Text(
-                '💡 Conseils pour vos photos :',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary),
-              ),
-              SizedBox(height: 8),
-              Text(
-                '• Formats acceptés : JPEG, PNG, WebP (max 5 Mo)\n• Prenez l\'objet sous une bonne lumière naturelle\n• Montrez les détails et marques d\'usure',
-                style: TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.4),
+            children: [
+              const Icon(Icons.info_outline_rounded, size: 18, color: AppColors.accent),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Aucun prix n\'est affiché sur Trocly. Les échanges et soultes éventuelles se négocient dans les offres.',
+                  style: AppTypography.sans(size: 12.5, color: AppColors.ink, height: 1.4),
+                ),
               ),
             ],
           ),
@@ -412,269 +408,262 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
     );
   }
 
-  // 2. Infos principales
-  Widget _step2Infos() {
+  Widget _step2CoreInfo() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Décrivez votre objet',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-        ),
+        Text('Décrivez votre objet', style: AppTypography.serif(size: 26)),
         const SizedBox(height: 6),
-        const Text(
-          'Donnez envie aux autres troqueurs.',
-          style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+        Text(
+          'Un titre précis et un état honnête évitent les mauvaises surprises lors du rendez-vous.',
+          style: AppTypography.sans(size: 13, color: AppColors.textSecondary, height: 1.45),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 22),
+        _fieldLabel('Titre'),
         TextField(
           controller: _titleController,
+          maxLength: 60,
+          onChanged: (_) {
+            if (_duplicateError != null) setState(() => _duplicateError = null);
+          },
           decoration: InputDecoration(
-            labelText: 'Titre de l\'annonce *',
-            hintText: 'Ex: VTT Btwin Rockrider 520 taille M',
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            hintText: 'ex. VTT Btwin Rockrider 520, taille M',
+            errorText: _duplicateError,
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 14),
+        _fieldLabel('Catégorie'),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppColors.line),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: _selectedCategory,
+              isExpanded: true,
+              dropdownColor: AppColors.surface,
+              items: _categories
+                  .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                  .toList(),
+              onChanged: (v) {
+                if (v != null) setState(() => _selectedCategory = v);
+              },
+            ),
+          ),
+        ),
+        const SizedBox(height: 18),
+        _fieldLabel('État'),
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppColors.line),
+          ),
+          child: Column(
+            children: List.generate(_conditionOptions.length, (i) {
+              final opt = _conditionOptions[i];
+              final selected = opt['key'] == _selectedCondition;
+              return Column(
+                children: [
+                  InkWell(
+                    onTap: () => setState(() => _selectedCondition = opt['key']!),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            margin: const EdgeInsets.only(top: 2),
+                            width: 18,
+                            height: 18,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: selected ? AppColors.ink : AppColors.borderStrong,
+                                width: selected ? 5.5 : 1.4,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  opt['label']!,
+                                  style: AppTypography.sans(
+                                    size: 13.5,
+                                    weight: selected ? FontWeight.w600 : FontWeight.w400,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  opt['desc']!,
+                                  style: AppTypography.sans(size: 11.5, color: AppColors.textHint),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (i < _conditionOptions.length - 1) const Divider(),
+                ],
+              );
+            }),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _step3DetailsAndWish() {
+    final cityNames = _listingsController.cities.isNotEmpty
+        ? _listingsController.cities.map((c) => c.name).toList()
+        : const ['Meknès', 'Fès', 'Rabat', 'Casablanca', 'Marrakech', 'Tanger', 'Agadir'];
+    if (!cityNames.contains(_selectedCity)) {
+      _selectedCity = cityNames.first;
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Détails et souhait d\'échange', style: AppTypography.serif(size: 26)),
+        const SizedBox(height: 20),
+        _fieldLabel('Description'),
         TextField(
           controller: _descController,
           maxLines: 4,
-          decoration: InputDecoration(
-            labelText: 'Description détaillée',
-            hintText: 'Précisez l\'état, les accessoires fournis, la raison de l\'échange...',
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          decoration: const InputDecoration(
+            hintText: 'Taille, accessoires fournis, défauts éventuels, quartier…',
           ),
         ),
         const SizedBox(height: 16),
-        DropdownButtonFormField<String>(
-          value: _selectedCity,
-          decoration: InputDecoration(
-            labelText: 'Ville où l\'objet est disponible *',
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-          items: _listingsController.cities.isNotEmpty
-              ? _listingsController.cities
-                  .map((c) => DropdownMenuItem(value: c.name, child: Text(c.name)))
-                  .toList()
-              : ['Meknès', 'Fès', 'Rabat', 'Casablanca', 'Marrakech']
-                  .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                  .toList(),
-          onChanged: (val) {
-            if (val != null) setState(() => _selectedCity = val);
-          },
-        ),
-      ],
-    );
-  }
-
-  // 3. Catégorie & État
-  Widget _step3Category() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Catégorie & État de l\'objet',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-        ),
-        const SizedBox(height: 6),
-        const Text(
-          'Permet un classement optimal dans le feed.',
-          style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-        ),
-        const SizedBox(height: 24),
-        const Text(
-          'Catégorie *',
-          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-        ),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: _categories.map((cat) {
-            final isSelected = _selectedCategory == cat;
-            return ChoiceChip(
-              label: Text(cat),
-              selected: isSelected,
-              selectedColor: AppColors.primary,
-              backgroundColor: AppColors.surface,
-              labelStyle: TextStyle(
-                color: isSelected ? Colors.white : AppColors.primary,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-              ),
-              onSelected: (_) => setState(() => _selectedCategory = cat),
-            );
-          }).toList(),
-        ),
-        const SizedBox(height: 24),
-        const Text(
-          'État du produit *',
-          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-        ),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: _conditions.map((cond) {
-            final isSelected = _selectedCondition == cond;
-            return ChoiceChip(
-              label: Text(cond.replaceAll('_', ' ')),
-              selected: isSelected,
-              selectedColor: AppColors.accent,
-              backgroundColor: AppColors.surface,
-              labelStyle: TextStyle(
-                color: isSelected ? Colors.white : AppColors.accent,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-              ),
-              onSelected: (_) => setState(() => _selectedCondition = cond),
-            );
-          }).toList(),
-        ),
-      ],
-    );
-  }
-
-  // 4. Attributs dynamiques (JSONB)
-  Widget _step4Attributes() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Caractéristiques spécifiques',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-        ),
-        const SizedBox(height: 6),
-        const Text(
-          'Facultatif : Renseignez la marque ou le modèle si applicable.',
-          style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-        ),
-        const SizedBox(height: 24),
+        _fieldLabel('Marque (facultatif)'),
         TextField(
-          decoration: InputDecoration(
-            labelText: 'Marque',
-            hintText: 'Ex: Apple, Decathlon, Nike...',
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-          onChanged: (val) => _attributes['marque'] = val,
+          controller: _brandController,
+          decoration: const InputDecoration(hintText: 'ex. Btwin, Sony, Apple…'),
         ),
         const SizedBox(height: 16),
-        TextField(
-          decoration: InputDecoration(
-            labelText: 'Modèle / Référence',
-            hintText: 'Ex: iPhone 13, Rockrider 520...',
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-          onChanged: (val) => _attributes['modele'] = val,
-        ),
-      ],
-    );
-  }
-
-  // 5. Ce que vous recherchez en échange
-  Widget _step5Wishes() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Que recherchez-vous en échange ?',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-        ),
-        const SizedBox(height: 6),
-        const Text(
-          'Indiquez des idées ou laissez ouvert à toute proposition.',
-          style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-        ),
-        const SizedBox(height: 24),
+        _fieldLabel('Ce que vous recherchez en échange'),
         TextField(
           controller: _wishController,
-          maxLines: 3,
-          decoration: InputDecoration(
-            labelText: 'Objets souhaités',
-            hintText: 'Ex: Trottinette, jeux PS5, matériel de camping ou ouvert...',
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          decoration: const InputDecoration(
+            hintText: 'ex. Console de jeux, appareil photo (séparés par des virgules)',
+          ),
+        ),
+        const SizedBox(height: 16),
+        _fieldLabel('Ville'),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppColors.line),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: _selectedCity,
+              isExpanded: true,
+              dropdownColor: AppColors.surface,
+              items: cityNames
+                  .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                  .toList(),
+              onChanged: (v) {
+                if (v != null) setState(() => _selectedCity = v);
+              },
+            ),
           ),
         ),
       ],
     );
   }
 
-  // 6. Récapitulatif
-  Widget _step6Summary() {
+  Widget _step4Review() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Vérifiez votre annonce',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-        ),
+        Text('Vérifiez votre annonce', style: AppTypography.serif(size: 26)),
         const SizedBox(height: 6),
-        const Text(
-          'Votre annonce sera visible instantanément par la communauté.',
-          style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+        Text(
+          'Elle sera visible immédiatement dans le fil de $_selectedCity.',
+          style: AppTypography.sans(size: 13, color: AppColors.textSecondary),
         ),
         const SizedBox(height: 20),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.border),
+        if (_previewBytes.isNotEmpty) ...[
+          SizedBox(
+            height: 84,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _previewBytes.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (_, i) => ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.memory(_previewBytes[i], width: 84, height: 84, fit: BoxFit.cover),
+              ),
+            ),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                _titleController.text.isNotEmpty ? _titleController.text : 'Sans titre',
-                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Catégorie : $_selectedCategory',
-                style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
-              ),
-              Text(
-                'État : ${_selectedCondition.replaceAll('_', ' ')}',
-                style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
-              ),
-              Text(
-                'Ville : $_selectedCity',
-                style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
-              ),
-              Text(
-                'Photos : ${_uploadedPhotoUrls.length} ajoutée(s)',
-                style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
-              ),
-              if (_wishController.text.isNotEmpty) ...[
-                const Divider(height: 20),
-                Text(
-                  'Recherche : ${_wishController.text}',
-                  style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
-                ),
-              ],
-            ],
-          ),
+          const SizedBox(height: 18),
+        ],
+        const Divider(),
+        _reviewRow('Titre', _titleController.text.trim()),
+        const Divider(),
+        _reviewRow('Catégorie', _selectedCategory),
+        const Divider(),
+        _reviewRow('État', _conditionLabel(_selectedCondition)),
+        const Divider(),
+        _reviewRow('Ville', _selectedCity),
+        const Divider(),
+        _reviewRow(
+          'Recherche en échange',
+          _wishController.text.trim().isNotEmpty
+              ? _wishController.text.trim()
+              : 'Ouvert aux propositions',
         ),
-        const SizedBox(height: 20),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: AppColors.accentLight,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: AppColors.accent.withOpacity(0.3)),
-          ),
-          child: Row(
-            children: const [
-              Icon(Icons.info_outline, color: AppColors.accent, size: 20),
-              SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Rappel Trocly : Aucun prix n\'est affiché ni stocké. Les propositions d\'échange et soultes éventuelles se négocient dans le chat.',
-                  style: TextStyle(fontSize: 11, color: AppColors.textPrimary, height: 1.3),
-                ),
-              ),
-            ],
-          ),
-        ),
+        const Divider(),
+        _reviewRow('Photos', '${_uploadedPhotoUrls.length} ajoutée(s)'),
+        const Divider(),
       ],
+    );
+  }
+
+  Widget _fieldLabel(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Text(
+        text,
+        style: AppTypography.sans(
+          size: 12.5,
+          weight: FontWeight.w500,
+          color: AppColors.textSecondary,
+        ),
+      ),
+    );
+  }
+
+  Widget _reviewRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 11),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 135,
+            child: Text(label, style: AppTypography.sans(size: 13, color: AppColors.textSecondary)),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: AppTypography.sans(size: 13.5, weight: FontWeight.w500),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

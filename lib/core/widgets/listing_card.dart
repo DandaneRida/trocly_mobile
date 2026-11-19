@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
+import '../theme/app_theme.dart';
 
+/// Carte d'annonce éditoriale : photo plein bord sans boîte lourde, titre,
+/// état/ville discret et désir d'échange en terre cuite.
 class ListingCard extends StatelessWidget {
   final String id;
   final String title;
@@ -8,6 +11,7 @@ class ListingCard extends StatelessWidget {
   final String? cityName;
   final String? relativeTime;
   final String? photoUrl;
+  final String? wishLabel;
   final VoidCallback onTap;
 
   const ListingCard({
@@ -18,84 +22,119 @@ class ListingCard extends StatelessWidget {
     this.cityName,
     this.relativeTime,
     this.photoUrl,
+    this.wishLabel,
     required this.onTap,
   }) : super(key: key);
 
+  String _formatCondition(String? raw) {
+    switch (raw) {
+      case 'neuf':
+        return 'Neuf';
+      case 'comme_neuf':
+        return 'Comme neuf';
+      case 'tres_bon':
+        return 'Très bon état';
+      case 'bon':
+        return 'Bon état';
+      case 'use':
+        return 'Usé';
+      default:
+        return raw ?? 'Bon état';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final hasPhoto = photoUrl != null && photoUrl!.isNotEmpty;
+    final wish = (wishLabel != null && wishLabel!.trim().isNotEmpty)
+        ? wishLabel!.trim()
+        : 'Ouvert aux propositions';
+    final isSpecificWish = wishLabel != null &&
+        wishLabel!.trim().isNotEmpty &&
+        wishLabel!.toLowerCase() != 'échange ouvert';
+
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        decoration: BoxDecoration(
-          color: AppColors.card,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.border, width: 1),
-        ),
-        padding: const EdgeInsets.all(8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Image / Placeholder container
-            Expanded(
+      borderRadius: BorderRadius.circular(10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Photo carrée plein bord
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(10),
               child: Container(
                 width: double.infinity,
-                decoration: BoxDecoration(
-                  color: AppColors.divider,
-                  borderRadius: BorderRadius.circular(8),
-                  image: photoUrl != null && photoUrl!.isNotEmpty
-                      ? DecorationImage(
-                          image: NetworkImage(photoUrl!),
-                          fit: BoxFit.cover,
-                        )
-                      : null,
-                ),
-                child: photoUrl == null || photoUrl!.isEmpty
-                    ? const Center(
-                        child: Icon(
-                          Icons.image_outlined,
-                          color: AppColors.textSecondary,
-                          size: 32,
-                        ),
+                color: AppColors.imagePlaceholder,
+                child: hasPhoto
+                    ? Image.network(
+                        photoUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => _placeholder(),
                       )
-                    : null,
+                    : _placeholder(),
               ),
             ),
-            const SizedBox(height: 8),
-            // Title
-            Text(
-              title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
-              ),
+          ),
+          const SizedBox(height: 8),
+          // Titre
+          Text(
+            title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: AppTypography.sans(
+              size: 13.5,
+              weight: FontWeight.w500,
+              color: AppColors.ink,
+              height: 1.25,
             ),
-            const SizedBox(height: 4),
-            // Condition · City
-            Text(
-              '${condition ?? 'Bon état'} · ${cityName ?? 'Meknès'}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 11,
-                color: AppColors.textSecondary,
-              ),
+          ),
+          const SizedBox(height: 3),
+          // État · Ville
+          Text(
+            '${_formatCondition(condition)} · ${cityName ?? 'Meknès'}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTypography.sans(
+              size: 11.5,
+              color: AppColors.textHint,
             ),
-            if (relativeTime != null) ...[
-              const SizedBox(height: 2),
-              Text(
-                relativeTime!,
-                style: const TextStyle(
-                  fontSize: 10,
-                  color: AppColors.textHint,
+          ),
+          const SizedBox(height: 4),
+          // Désir d'échange
+          Row(
+            children: [
+              Icon(
+                Icons.swap_horiz_rounded,
+                size: 13,
+                color: isSpecificWish ? AppColors.accent : AppColors.textSecondary,
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  wish,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.sans(
+                    size: 11.5,
+                    weight: isSpecificWish ? FontWeight.w500 : FontWeight.w400,
+                    color: isSpecificWish ? AppColors.accent : AppColors.textSecondary,
+                  ),
                 ),
               ),
             ],
-          ],
-        ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _placeholder() {
+    return const Center(
+      child: Icon(
+        Icons.photo_outlined,
+        color: AppColors.textHint,
+        size: 30,
       ),
     );
   }

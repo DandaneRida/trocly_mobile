@@ -39,6 +39,7 @@ class ListingModel {
   String status;
   String userId;
   String? userName;
+  Map<String, dynamic> attributes;
 
   ListingModel({
     required this.id,
@@ -53,7 +54,18 @@ class ListingModel {
     required this.status,
     required this.userId,
     this.userName,
+    this.attributes = const {},
   });
+
+  List<String> get wishes {
+    final w = attributes['wishes'];
+    if (w is List) {
+      return w.map((e) => e.toString()).where((s) => s.trim().isNotEmpty).toList();
+    }
+    return const [];
+  }
+
+  String get wishSummary => wishes.isNotEmpty ? wishes.join(', ') : 'Ouvert aux propositions';
 
   factory ListingModel.fromJson(Map<String, dynamic> json) {
     final rawPhotos = List<String>.from(json['photos'] ?? []);
@@ -63,6 +75,11 @@ class ListingModel {
       }
       return '$apiUrl$url';
     }).toList();
+
+    final rawAttrs = json['attributes'];
+    final parsedAttrs = rawAttrs is Map
+        ? Map<String, dynamic>.from(rawAttrs)
+        : <String, dynamic>{};
 
     return ListingModel(
       id: json['id']?.toString() ?? '',
@@ -79,6 +96,7 @@ class ListingModel {
       status: json['status'] ?? 'active',
       userId: json['user']?['id']?.toString() ?? '',
       userName: json['user']?['displayName'],
+      attributes: parsedAttrs,
     );
   }
 }

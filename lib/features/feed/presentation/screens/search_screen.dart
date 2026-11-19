@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../../controllers/listings_controller.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/listing_card.dart';
-import '../../../../core/widgets/primary_button.dart';
+import '../../../../core/widgets/state_page.dart';
+import '../../../../core/widgets/trocly_bottom_nav.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({Key? key}) : super(key: key);
@@ -15,8 +17,6 @@ class SearchScreen extends StatefulWidget {
 class _SearchScreenState extends State<SearchScreen> {
   final ListingsController _listingsController = Get.find<ListingsController>();
   final _searchController = TextEditingController();
-  final _minPriceController = TextEditingController();
-  final _maxPriceController = TextEditingController();
 
   String? _selectedCategory;
   String? _selectedCondition;
@@ -33,18 +33,21 @@ class _SearchScreenState extends State<SearchScreen> {
     'Bricolage',
   ];
 
-  final List<String> _conditions = const [
-    'neuf',
-    'comme_neuf',
-    'tres_bon',
-    'bon',
-    'use',
-  ];
+  final Map<String, String> _conditionLabels = const {
+    'neuf': 'Neuf',
+    'comme_neuf': 'Comme neuf',
+    'tres_bon': 'Très bon état',
+    'bon': 'Bon état',
+    'use': 'Usé',
+  };
 
   @override
   void initState() {
     super.initState();
     _selectedCity = _listingsController.selectedCity.value;
+    if (_listingsController.cities.isEmpty) {
+      _listingsController.fetchCities();
+    }
   }
 
   void _applyFilters() {
@@ -54,24 +57,17 @@ class _SearchScreenState extends State<SearchScreen> {
       if (found != null) cityId = found.id;
     }
 
-    final double? minVal = double.tryParse(_minPriceController.text.trim());
-    final double? maxVal = double.tryParse(_maxPriceController.text.trim());
-
     _listingsController.fetchListings(
       search: _searchController.text.trim().isEmpty ? null : _searchController.text.trim(),
       category: (_selectedCategory == null || _selectedCategory == 'Tous') ? null : _selectedCategory,
       condition: _selectedCondition,
       cityId: cityId,
-      minValue: minVal,
-      maxValue: maxVal,
     );
   }
 
   void _reset() {
     setState(() {
       _searchController.clear();
-      _minPriceController.clear();
-      _maxPriceController.clear();
       _selectedCategory = null;
       _selectedCondition = null;
       _selectedCity = _listingsController.selectedCity.value;
@@ -82,174 +78,189 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   void dispose() {
     _searchController.dispose();
-    _minPriceController.dispose();
-    _maxPriceController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.paper,
+      bottomNavigationBar: const TroclyBottomNav(currentIndex: 1),
       appBar: AppBar(
-        title: const Text('Recherche & Filtres'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Get.back(),
-        ),
+        title: Text('Explorer', style: AppTypography.serif(size: 22)),
         actions: [
           TextButton(
             onPressed: _reset,
-            child: const Text('Effacer', style: TextStyle(color: Colors.white70)),
+            child: Text(
+              'Réinitialiser',
+              style: AppTypography.sans(size: 12.5, color: AppColors.accent, weight: FontWeight.w600),
+            ),
           ),
         ],
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Search Input Box
-            Container(
-              padding: const EdgeInsets.all(16),
-              color: AppColors.surface,
-              child: Column(
-                children: [
-                  TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      hintText: 'Que recherchez-vous ? (ex: iPhone, Vélo...)',
-                      prefixIcon: const Icon(Icons.search, color: AppColors.primary),
-                      suffixIcon: IconButton(
-                        icon: const Icon(Icons.send_rounded, color: AppColors.primary),
-                        onPressed: _applyFilters,
-                      ),
-                      filled: true,
-                      fillColor: AppColors.background,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 14),
+            child: Column(
+              children: [
+                TextField(
+                  controller: _searchController,
+                  textInputAction: TextInputAction.search,
+                  onSubmitted: (_) => _applyFilters(),
+                  decoration: InputDecoration(
+                    hintText: 'Rechercher un vélo, un livre, une console…',
+                    prefixIcon: const Icon(Icons.search_rounded, size: 20, color: AppColors.textHint),
+                    suffixIcon: IconButton(
+                      icon: const Icon(Icons.arrow_forward_rounded, size: 19, color: AppColors.ink),
+                      onPressed: _applyFilters,
                     ),
-                    onSubmitted: (_) => _applyFilters(),
                   ),
-                  const SizedBox(height: 12),
-                  // Filtres déroulants : Catégorie & Condition & Ville
-                  SingleChildScrollView(
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 36,
+                  child: ListView(
                     scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        // Dropdown Ville
-                        Obx(() {
-                          final cities = _listingsController.cities;
-                          return DropdownButton<String>(
-                            value: _selectedCity,
-                            hint: const Text('Ville'),
-                            underline: const SizedBox.shrink(),
-                            items: cities.map((c) {
-                              return DropdownMenuItem(value: c.name, child: Text(c.name));
-                            }).toList(),
-                            onChanged: (val) {
-                              setState(() => _selectedCity = val);
-                              _applyFilters();
-                            },
-                          );
-                        }),
-                        const SizedBox(width: 12),
-                        // Dropdown Catégorie
-                        DropdownButton<String>(
-                          value: _selectedCategory,
-                          hint: const Text('Catégorie'),
-                          underline: const SizedBox.shrink(),
-                          items: _categories.map((c) {
-                            return DropdownMenuItem(value: c, child: Text(c));
-                          }).toList(),
-                          onChanged: (val) {
-                            setState(() => _selectedCategory = val);
+                    children: [
+                      // Ville
+                      Obx(() {
+                        final cities = _listingsController.cities;
+                        return _filterDropdown<String>(
+                          value: cities.any((c) => c.name == _selectedCity) ? _selectedCity : null,
+                          hint: 'Ville',
+                          items: cities
+                              .map((c) => DropdownMenuItem(value: c.name, child: Text(c.name)))
+                              .toList(),
+                          onChanged: (v) {
+                            setState(() => _selectedCity = v);
                             _applyFilters();
                           },
-                        ),
-                        const SizedBox(width: 12),
-                        // Dropdown Condition
-                        DropdownButton<String>(
-                          value: _selectedCondition,
-                          hint: const Text('État'),
-                          underline: const SizedBox.shrink(),
-                          items: _conditions.map((c) {
-                            return DropdownMenuItem(value: c, child: Text(c));
-                          }).toList(),
-                          onChanged: (val) {
-                            setState(() => _selectedCondition = val);
-                            _applyFilters();
-                          },
-                        ),
-                      ],
-                    ),
+                        );
+                      }),
+                      const SizedBox(width: 8),
+                      // Catégorie
+                      _filterDropdown<String>(
+                        value: _selectedCategory,
+                        hint: 'Catégorie',
+                        items: _categories
+                            .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                            .toList(),
+                        onChanged: (v) {
+                          setState(() => _selectedCategory = v);
+                          _applyFilters();
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      // État
+                      _filterDropdown<String>(
+                        value: _selectedCondition,
+                        hint: 'État',
+                        items: _conditionLabels.entries
+                            .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
+                            .toList(),
+                        onChanged: (v) {
+                          setState(() => _selectedCondition = v);
+                          _applyFilters();
+                        },
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-            const Divider(height: 1),
-
-            // Résultats
-            Expanded(
-              child: Obx(() {
-                if (_listingsController.isLoading.value) {
-                  return const Center(
-                    child: CircularProgressIndicator(color: AppColors.primary),
-                  );
-                }
-
-                if (_listingsController.listings.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: const [
-                        Icon(Icons.search_off_rounded, size: 64, color: AppColors.textHint),
-                        SizedBox(height: 12),
-                        Text(
-                          'Aucun résultat pour cette recherche',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        SizedBox(height: 6),
-                        Text(
-                          'Essayez d\'ajuster vos critères ou mots-clés.',
-                          style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-
-                return GridView.builder(
-                  padding: const EdgeInsets.all(16),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    childAspectRatio: 0.72,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                  ),
-                  itemCount: _listingsController.listings.length,
-                  itemBuilder: (context, index) {
-                    final item = _listingsController.listings[index];
-                    return ListingCard(
-                      id: item.id,
-                      title: item.title,
-                      condition: item.condition,
-                      cityName: item.city,
-                      relativeTime: 'Résultat',
-                      photoUrl: item.photos.isNotEmpty ? item.photos.first : null,
-                      onTap: () {
-                        Get.toNamed('/listing/${item.id}', arguments: item);
-                      },
-                    );
-                  },
+          ),
+          const Divider(),
+          Expanded(
+            child: Obx(() {
+              if (_listingsController.isLoading.value) {
+                return const Center(
+                  child: CircularProgressIndicator(color: AppColors.ink, strokeWidth: 2),
                 );
-              }),
-            ),
-          ],
+              }
+              if (_listingsController.listings.isEmpty) {
+                return StatePage(
+                  type: StatePageType.emptyResults,
+                  actionLabel: 'Réinitialiser les filtres',
+                  onAction: _reset,
+                );
+              }
+              return GridView.builder(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  childAspectRatio: 0.67,
+                  crossAxisSpacing: 14,
+                  mainAxisSpacing: 20,
+                ),
+                itemCount: _listingsController.listings.length,
+                itemBuilder: (_, index) {
+                  final item = _listingsController.listings[index];
+                  return ListingCard(
+                    id: item.id,
+                    title: item.title,
+                    condition: item.condition,
+                    cityName: item.city,
+                    photoUrl: item.photos.isNotEmpty ? item.photos.first : null,
+                    wishLabel: item.wishSummary,
+                    onTap: () => Get.toNamed('/listing/${item.id}', arguments: item),
+                  );
+                },
+              );
+            }),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _filterDropdown<T>({
+    required T? value,
+    required String hint,
+    required List<DropdownMenuItem<T>> items,
+    required ValueChanged<T?> onChanged,
+  }) {
+    final active = value != null && value != 'Tous';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: active ? AppColors.ink : AppColors.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: active ? AppColors.ink : AppColors.line),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<T>(
+          value: value,
+          hint: Text(
+            hint,
+            style: AppTypography.sans(size: 12.5, color: AppColors.textSecondary),
+          ),
+          icon: Icon(
+            Icons.keyboard_arrow_down_rounded,
+            size: 16,
+            color: active ? Colors.white : AppColors.textSecondary,
+          ),
+          dropdownColor: AppColors.surface,
+          style: AppTypography.sans(
+            size: 12.5,
+            weight: FontWeight.w500,
+            color: AppColors.ink,
+          ),
+          selectedItemBuilder: (ctx) => items
+              .map((item) => Align(
+                    alignment: Alignment.centerLeft,
+                    child: DefaultTextStyle(
+                      style: AppTypography.sans(
+                        size: 12.5,
+                        weight: FontWeight.w500,
+                        color: active ? Colors.white : AppColors.ink,
+                      ),
+                      child: item.child,
+                    ),
+                  ))
+              .toList(),
+          items: items,
+          onChanged: onChanged,
         ),
       ),
     );

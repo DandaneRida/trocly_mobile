@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
+import '../theme/app_theme.dart';
 import 'primary_button.dart';
 
 enum StatePageType {
@@ -37,7 +38,7 @@ class StatePage extends StatelessWidget {
         return Icons.search_off_rounded;
       case StatePageType.offerExpired:
       case StatePageType.meetingExpired:
-        return Icons.timer_off_outlined;
+        return Icons.schedule_rounded;
       case StatePageType.qrFailed:
         return Icons.qr_code_scanner_rounded;
       case StatePageType.loading:
@@ -51,17 +52,17 @@ class StatePage extends StatelessWidget {
       case StatePageType.offline:
         return 'Aucune connexion internet';
       case StatePageType.emptyCity:
-        return 'Aucune annonce dans cette ville';
+        return 'Rien dans cette ville pour l\'instant';
       case StatePageType.emptyResults:
-        return 'Aucun résultat trouvé';
+        return 'Aucun résultat';
       case StatePageType.offerExpired:
         return 'Cette offre a expiré';
       case StatePageType.meetingExpired:
-        return 'Rendez-vous expiré (> 2 h)';
+        return 'Rendez-vous expiré';
       case StatePageType.qrFailed:
-        return 'Échec du scan QR';
+        return 'Échec du scan';
       case StatePageType.loading:
-        return 'Chargement en cours...';
+        return 'Chargement…';
     }
   }
 
@@ -69,19 +70,19 @@ class StatePage extends StatelessWidget {
     if (customMessage != null) return customMessage!;
     switch (type) {
       case StatePageType.offline:
-        return 'Vérifiez votre connexion Wi-Fi ou vos données mobiles et réessayez.';
+        return 'Vérifiez votre connexion et réessayez.';
       case StatePageType.emptyCity:
-        return 'Soyez le premier à publier un objet ou élargissez votre recherche aux autres villes.';
+        return 'Publiez le premier objet ou changez de ville pour élargir la recherche.';
       case StatePageType.emptyResults:
-        return 'Essayez de modifier vos filtres ou vos critères de recherche.';
+        return 'Essayez d\'assouplir vos filtres ou de chercher un autre terme.';
       case StatePageType.offerExpired:
-        return 'Le délai de réponse est dépassé. Vous pouvez créer une nouvelle proposition.';
+        return 'Le délai de réponse est dépassé. Vous pouvez soumettre une nouvelle proposition.';
       case StatePageType.meetingExpired:
-        return 'Le créneau de rencontre est dépassé de plus de 2 heures sans double scan.';
+        return 'Le créneau est dépassé de plus de 2 heures sans double scan.';
       case StatePageType.qrFailed:
-        return 'Le QR code scanné n\'a pas pu être validé. Veuillez réessayer.';
+        return 'Le code scanné n\'a pas pu être validé. Réessayez face au code de l\'autre participant.';
       case StatePageType.loading:
-        return 'Veuillez patienter pendant la récupération des données.';
+        return 'Récupération des données en cours.';
     }
   }
 
@@ -89,45 +90,44 @@ class StatePage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
+        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 36),
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              width: 80,
-              height: 80,
-              decoration: const BoxDecoration(
-                color: AppColors.divider,
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: AppColors.bubble,
                 shape: BoxShape.circle,
+                border: Border.all(color: AppColors.line),
               ),
-              child: Icon(_icon(), size: 40, color: AppColors.primary),
+              child: Icon(_icon(), size: 28, color: AppColors.ink),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 18),
             Text(
               _title(),
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
-              ),
+              style: AppTypography.serif(size: 21),
             ),
             const SizedBox(height: 8),
             Text(
               _message(),
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 13,
+              style: AppTypography.sans(
+                size: 13,
                 color: AppColors.textSecondary,
-                height: 1.4,
+                height: 1.45,
               ),
             ),
             if (actionLabel != null && onAction != null) ...[
-              const SizedBox(height: 24),
-              PrimaryButton(
-                label: actionLabel!,
-                onPressed: onAction,
+              const SizedBox(height: 22),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 260),
+                child: PrimaryButton(
+                  label: actionLabel!,
+                  onPressed: onAction,
+                ),
               ),
             ],
           ],

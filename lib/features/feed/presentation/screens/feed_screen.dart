@@ -3,8 +3,10 @@ import 'package:get/get.dart';
 import '../../../../controllers/auth_controller.dart';
 import '../../../../controllers/listings_controller.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/widgets/auth_guard_bottom_sheet.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/listing_card.dart';
+import '../../../../core/widgets/state_page.dart';
+import '../../../../core/widgets/trocly_bottom_nav.dart';
 
 class FeedScreen extends StatefulWidget {
   const FeedScreen({Key? key}) : super(key: key);
@@ -19,7 +21,7 @@ class _FeedScreenState extends State<FeedScreen> {
 
   int _selectedCategoryIndex = 0;
   final List<String> _categories = const [
-    'Tous',
+    'Tout',
     'Électronique',
     'Maison',
     'Véhicules',
@@ -41,63 +43,79 @@ class _FeedScreenState extends State<FeedScreen> {
   void _showCityPicker() {
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      backgroundColor: AppColors.paper,
       builder: (ctx) {
-        return Obx(() {
-          final cities = _listingsController.cities;
-          return Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Changer de ville',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                if (cities.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.all(16.0),
-                    child: Center(child: CircularProgressIndicator()),
-                  )
-                else
-                  Flexible(
-                    child: ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: cities.length,
-                      itemBuilder: (context, idx) {
-                        final city = cities[idx];
-                        final isSelected = city.name == _listingsController.selectedCity.value;
-                        return ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: Text(
-                            city.name,
-                            style: TextStyle(
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                              color: isSelected ? AppColors.primary : AppColors.textPrimary,
-                            ),
-                          ),
-                          trailing: isSelected ? const Icon(Icons.check, color: AppColors.primary) : null,
-                          onTap: () {
-                            _authController.selectedCity.value = city.name;
-                            _listingsController.changeCity(city.name);
-                            Navigator.pop(ctx);
-                          },
-                        );
-                      },
+        return SafeArea(
+          child: Obx(() {
+            final cities = _listingsController.cities;
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 36,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: AppColors.borderStrong,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
                   ),
-              ],
-            ),
-          );
-        });
+                  const SizedBox(height: 18),
+                  Text('Choisir une ville', style: AppTypography.serif(size: 22)),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Affichez les objets disponibles à l\'échange autour de vous.',
+                    style: AppTypography.sans(size: 12.5, color: AppColors.textSecondary),
+                  ),
+                  const SizedBox(height: 14),
+                  const Divider(),
+                  if (cities.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Center(
+                        child: CircularProgressIndicator(color: AppColors.ink, strokeWidth: 2),
+                      ),
+                    )
+                  else
+                    Flexible(
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: cities.length,
+                        separatorBuilder: (_, __) => const Divider(),
+                        itemBuilder: (context, idx) {
+                          final city = cities[idx];
+                          final isSelected = city.name == _listingsController.selectedCity.value;
+                          return ListTile(
+                            contentPadding: const EdgeInsets.symmetric(vertical: 2),
+                            title: Text(
+                              city.name,
+                              style: AppTypography.sans(
+                                size: 14.5,
+                                weight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                                color: AppColors.ink,
+                              ),
+                            ),
+                            trailing: isSelected
+                                ? const Icon(Icons.check_rounded, size: 18, color: AppColors.accent)
+                                : null,
+                            onTap: () {
+                              _authController.selectedCity.value = city.name;
+                              _listingsController.changeCity(city.name);
+                              Navigator.pop(ctx);
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            );
+          }),
+        );
       },
     );
   }
@@ -105,279 +123,276 @@ class _FeedScreenState extends State<FeedScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: InkWell(
-          onTap: _showCityPicker,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Obx(() => Text('Trocly · ${_listingsController.selectedCity.value} ▾')),
-            ],
-          ),
-        ),
-        actions: [
-          Obx(() {
-            final loggedIn = _authController.authToken.value.isNotEmpty;
-            if (!loggedIn) {
-              return TextButton(
-                onPressed: () => Get.toNamed('/login'),
-                child: const Text(
-                  'Se connecter',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                  ),
-                ),
-              );
-            }
-            return IconButton(
-              icon: const Icon(Icons.notifications_none_rounded),
-              onPressed: () => Get.toNamed('/notifications'),
-            );
-          }),
-        ],
-      ),
-      bottomNavigationBar: Obx(() {
-        final loggedIn = _authController.authToken.value.isNotEmpty;
-        if (!loggedIn) {
-          return const SizedBox.shrink();
-        }
-        return NavigationBar(
-          selectedIndex: 0,
-          backgroundColor: AppColors.surface,
-          indicatorColor: AppColors.primary.withOpacity(0.12),
-          onDestinationSelected: (index) {
-            if (index == 1) Get.toNamed('/search');
-            if (index == 2) Get.toNamed('/publish');
-            if (index == 3) Get.toNamed('/messages');
-            if (index == 4) Get.toNamed('/profile');
-          },
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.home_outlined),
-              selectedIcon: Icon(Icons.home, color: AppColors.primary),
-              label: 'Accueil',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.search_outlined),
-              selectedIcon: Icon(Icons.search, color: AppColors.primary),
-              label: 'Recherche',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.add_circle_outline),
-              selectedIcon: Icon(Icons.add_circle, color: AppColors.primary),
-              label: 'Publier',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.chat_bubble_outline),
-              selectedIcon: Icon(Icons.chat_bubble, color: AppColors.primary),
-              label: 'Messages',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.person_outline),
-              selectedIcon: Icon(Icons.person, color: AppColors.primary),
-              label: 'Profil',
-            ),
-          ],
-        );
-      }),
-      body: RefreshIndicator(
-        onRefresh: () => _listingsController.fetchListings(),
-        color: AppColors.primary,
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Bannière
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [AppColors.primary, Color(0xFF2C3E50)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
-                          Text(
-                            'Donnez une seconde vie à vos objets',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
+      backgroundColor: AppColors.paper,
+      bottomNavigationBar: const TroclyBottomNav(currentIndex: 0),
+      body: SafeArea(
+        child: RefreshIndicator(
+          onRefresh: () => _listingsController.fetchListings(),
+          color: AppColors.ink,
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              // Top brand header
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          AppTypography.wordmark(size: 26),
+                          Obx(() {
+                            final loggedIn = _authController.authToken.value.isNotEmpty;
+                            if (!loggedIn) {
+                              return InkWell(
+                                onTap: () => Get.toNamed('/login'),
+                                borderRadius: BorderRadius.circular(8),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: AppColors.ink),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    'Connexion',
+                                    style: AppTypography.sans(
+                                      size: 12.5,
+                                      weight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }
+                            return IconButton(
+                              onPressed: () => Get.toNamed('/notifications'),
+                              icon: Stack(
+                                clipBehavior: Clip.none,
+                                children: [
+                                  const Icon(Icons.notifications_none_rounded, size: 23, color: AppColors.ink),
+                                  Positioned(
+                                    top: 1,
+                                    right: 1,
+                                    child: Container(
+                                      width: 8,
+                                      height: 8,
+                                      decoration: BoxDecoration(
+                                        color: AppColors.accent,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(color: AppColors.paper, width: 1.5),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      // Search input + Filter icon
+                      Row(
+                        children: [
+                          Expanded(
+                            child: InkWell(
+                              onTap: () => Get.toNamed('/search'),
+                              borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                height: 44,
+                                padding: const EdgeInsets.symmetric(horizontal: 13),
+                                decoration: BoxDecoration(
+                                  color: AppColors.surface,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: AppColors.line),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.search_rounded, size: 19, color: AppColors.textHint),
+                                    const SizedBox(width: 9),
+                                    Text(
+                                      'Vélo, livres, console…',
+                                      style: AppTypography.sans(
+                                        size: 13.5,
+                                        color: AppColors.textHint,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
                           ),
-                          SizedBox(height: 6),
-                          Text(
-                            'Échangez facilement et en toute sécurité par QR code.',
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 12,
+                          const SizedBox(width: 8),
+                          InkWell(
+                            onTap: () => Get.toNamed('/search'),
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: AppColors.surface,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: AppColors.line),
+                              ),
+                              child: const Icon(Icons.tune_rounded, size: 19, color: AppColors.ink),
                             ),
                           ),
                         ],
                       ),
-                    ),
-                    const Icon(Icons.swap_calls_rounded, size: 48, color: AppColors.accent),
-                  ],
+                      const SizedBox(height: 11),
+                      // City picker line
+                      InkWell(
+                        onTap: _showCityPicker,
+                        borderRadius: BorderRadius.circular(6),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 2),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.location_on_outlined, size: 15, color: AppColors.textSecondary),
+                              const SizedBox(width: 5),
+                              Obx(() => Text(
+                                    _listingsController.selectedCity.value,
+                                    style: AppTypography.sans(
+                                      size: 13,
+                                      weight: FontWeight.w500,
+                                      color: AppColors.ink,
+                                    ),
+                                  )),
+                              Text(
+                                ' · changer de ville',
+                                style: AppTypography.sans(
+                                  size: 12.5,
+                                  color: AppColors.textHint,
+                                ),
+                              ),
+                              const SizedBox(width: 2),
+                              const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: AppColors.textHint),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 16),
-              // Category ChoiceChips
-              SizedBox(
-                height: 38,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: _categories.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
-                  itemBuilder: (context, index) {
-                    final isSelected = _selectedCategoryIndex == index;
-                    return ChoiceChip(
-                      label: Text(_categories[index]),
-                      selected: isSelected,
-                      selectedColor: AppColors.primary,
-                      backgroundColor: AppColors.surface,
-                      labelStyle: TextStyle(
-                        color: isSelected ? Colors.white : AppColors.primary,
-                        fontSize: 12,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        side: const BorderSide(color: AppColors.primary, width: 1),
-                      ),
-                      onSelected: (selected) {
-                        setState(() => _selectedCategoryIndex = index);
-                        if (index == 0) {
-                          _listingsController.filterByCategory('Tous');
-                        } else {
-                          _listingsController.filterByCategory(_categories[index]);
-                        }
-                      },
-                    );
-                  },
+
+              // Underlined category tabs
+              SliverToBoxAdapter(
+                child: Container(
+                  margin: const EdgeInsets.only(top: 12),
+                  decoration: const BoxDecoration(
+                    border: Border(bottom: BorderSide(color: AppColors.line)),
+                  ),
+                  height: 40,
+                  child: ListView.separated(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _categories.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 22),
+                    itemBuilder: (context, index) {
+                      final isSelected = _selectedCategoryIndex == index;
+                      return GestureDetector(
+                        onTap: () {
+                          setState(() => _selectedCategoryIndex = index);
+                          _listingsController.filterByCategory(
+                            index == 0 ? 'Tous' : _categories[index],
+                          );
+                        },
+                        child: Container(
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            border: Border(
+                              bottom: BorderSide(
+                                color: isSelected ? AppColors.ink : Colors.transparent,
+                                width: 2,
+                              ),
+                            ),
+                          ),
+                          child: Text(
+                            _categories[index],
+                            style: AppTypography.sans(
+                              size: 13.5,
+                              weight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                              color: isSelected ? AppColors.ink : AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                 ),
               ),
-              const SizedBox(height: 16),
-              // Filter chips (Catégorie, État, Ville)
-              Row(
-                children: [
-                  ActionChip(
-                    avatar: const Icon(Icons.filter_list, size: 16, color: AppColors.primary),
-                    label: const Text('Filtres'),
-                    backgroundColor: AppColors.surface,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      side: const BorderSide(color: AppColors.border),
-                    ),
-                    onPressed: () => Get.toNamed('/search'),
+
+              // Section heading
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 14),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Nouveautés près de vous', style: AppTypography.serif(size: 21)),
+                      Obx(() {
+                        final n = _listingsController.listings.length;
+                        return Text(
+                          '$n annonce${n > 1 ? 's' : ''}',
+                          style: AppTypography.sans(size: 12, color: AppColors.textHint),
+                        );
+                      }),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  ActionChip(
-                    avatar: const Icon(Icons.location_city, size: 16, color: AppColors.primary),
-                    label: Obx(() => Text(_listingsController.selectedCity.value)),
-                    backgroundColor: AppColors.surface,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      side: const BorderSide(color: AppColors.border),
-                    ),
-                    onPressed: _showCityPicker,
-                  ),
-                ],
+                ),
               ),
-              const SizedBox(height: 20),
-              // Header title with count
-              Obx(() {
-                final count = _listingsController.listings.length;
-                return Text(
-                  'Annonces actives · $count objet${count > 1 ? 's' : ''}',
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
-                  ),
-                );
-              }),
-              const SizedBox(height: 12),
-              // Listings Grid
+
+              // Listings grid / states
               Obx(() {
                 if (_listingsController.isLoading.value) {
-                  return const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(40.0),
-                      child: CircularProgressIndicator(color: AppColors.primary),
+                  return const SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Center(
+                      child: CircularProgressIndicator(color: AppColors.ink, strokeWidth: 2),
                     ),
                   );
                 }
 
                 if (_listingsController.listings.isEmpty) {
-                  return Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(32),
-                    child: Column(
-                      children: [
-                        const Icon(Icons.inventory_2_outlined, size: 54, color: AppColors.textHint),
-                        const SizedBox(height: 12),
-                        const Text(
-                          'Aucune annonce pour le moment',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        const Text(
-                          'Élargissez votre recherche aux autres villes marocaines ou publiez le premier objet !',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                        ),
-                        const SizedBox(height: 16),
-                        OutlinedButton.icon(
-                          onPressed: _showCityPicker,
-                          icon: const Icon(Icons.location_on),
-                          label: const Text('Changer de ville'),
-                        ),
-                      ],
+                  return SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: StatePage(
+                      type: StatePageType.emptyCity,
+                      actionLabel: 'Changer de ville',
+                      onAction: _showCityPicker,
                     ),
                   );
                 }
 
-                return GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    childAspectRatio: 0.72,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                  ),
-                  itemCount: _listingsController.listings.length,
-                  itemBuilder: (context, index) {
-                    final item = _listingsController.listings[index];
-                    return ListingCard(
-                      id: item.id,
-                      title: item.title,
-                      condition: item.condition,
-                      cityName: item.city,
-                      relativeTime: 'Actif',
-                      photoUrl: item.photos.isNotEmpty ? item.photos.first : null,
-                      onTap: () {
-                        Get.toNamed('/listing/${item.id}', arguments: item);
+                return SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+                  sliver: SliverGrid(
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      childAspectRatio: 0.67,
+                      crossAxisSpacing: 14,
+                      mainAxisSpacing: 20,
+                    ),
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        final item = _listingsController.listings[index];
+                        return ListingCard(
+                          id: item.id,
+                          title: item.title,
+                          condition: item.condition,
+                          cityName: item.city,
+                          photoUrl: item.photos.isNotEmpty ? item.photos.first : null,
+                          wishLabel: item.wishSummary,
+                          onTap: () => Get.toNamed('/listing/${item.id}', arguments: item),
+                        );
                       },
-                    );
-                  },
+                      childCount: _listingsController.listings.length,
+                    ),
+                  ),
                 );
               }),
             ],
