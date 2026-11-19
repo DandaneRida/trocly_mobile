@@ -8,6 +8,7 @@ import 'controllers/offers_controller.dart';
 import 'controllers/chat_controller.dart';
 import 'controllers/meeting_controller.dart';
 import 'controllers/reviews_controller.dart';
+import 'controllers/notifications_controller.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,6 +22,7 @@ void main() async {
   Get.put<ChatController>(ChatController(), permanent: true);
   Get.put<MeetingController>(MeetingController(), permanent: true);
   Get.put<ReviewsController>(ReviewsController(), permanent: true);
+  Get.put<NotificationsController>(NotificationsController(), permanent: true);
 
   runApp(const TroclyApp());
 }
