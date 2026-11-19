@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:convert';
 import 'auth_controller.dart';
@@ -55,7 +56,6 @@ class ListingModel {
   });
 
   factory ListingModel.fromJson(Map<String, dynamic> json) {
-    // Transformer l'URL relative en URL absolue avec l'apiUrl si nécessaire
     final rawPhotos = List<String>.from(json['photos'] ?? []);
     final fullPhotos = rawPhotos.map((url) {
       if (url.startsWith('http://') || url.startsWith('https://')) {
@@ -98,7 +98,6 @@ class ListingsController extends GetxController {
   var errorMessage = ''.obs;
 
   final client = http.Client();
-  final ImagePicker _picker = ImagePicker();
 
   Map<String, String> _getAuthHeaders() {
     final authController = Get.find<AuthController>();
@@ -133,10 +132,21 @@ class ListingsController extends GetxController {
       }
 
       final bytes = await file.readAsBytes();
+      final name = file.name.isNotEmpty ? file.name : 'photo.jpg';
+
+      // Détecter le MediaType approprié
+      MediaType contentType = MediaType('image', 'jpeg');
+      if (name.toLowerCase().endsWith('.png')) {
+        contentType = MediaType('image', 'png');
+      } else if (name.toLowerCase().endsWith('.webp')) {
+        contentType = MediaType('image', 'webp');
+      }
+
       final multipartFile = http.MultipartFile.fromBytes(
         'file',
         bytes,
-        filename: file.name.isNotEmpty ? file.name : 'photo.jpg',
+        filename: name,
+        contentType: contentType,
       );
       request.files.add(multipartFile);
 
@@ -150,10 +160,12 @@ class ListingsController extends GetxController {
           return relativeUrl.toString();
         }
       } else {
-        debugPrint('Upload failed with status: ${response.statusCode}');
+        debugPrint('Upload failed with status: ${response.statusCode}, body: ${response.body}');
+        errorMessage.value = 'Erreur serveur (${response.statusCode}) : ${response.body}';
       }
     } catch (e) {
       debugPrint('Error uploadImage: $e');
+      errorMessage.value = 'Erreur réseau: $e';
     }
     return null;
   }
