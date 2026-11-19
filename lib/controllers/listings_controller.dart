@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 import 'dart:convert';
 import 'auth_controller.dart';
 import 'offers_controller.dart';
@@ -54,6 +55,15 @@ class ListingModel {
   });
 
   factory ListingModel.fromJson(Map<String, dynamic> json) {
+    // Transformer l'URL relative en URL absolue avec l'apiUrl si nécessaire
+    final rawPhotos = List<String>.from(json['photos'] ?? []);
+    final fullPhotos = rawPhotos.map((url) {
+      if (url.startsWith('http://') || url.startsWith('https://')) {
+        return url;
+      }
+      return '$apiUrl$url';
+    }).toList();
+
     return ListingModel(
       id: json['id']?.toString() ?? '',
       title: json['title'] ?? '',
@@ -65,7 +75,7 @@ class ListingModel {
           : 0.0,
       city: json['city']?['name'] ?? 'Inconnue',
       cityId: json['city']?['id'] is int ? json['city']['id'] : null,
-      photos: List<String>.from(json['photos'] ?? []),
+      photos: fullPhotos,
       status: json['status'] ?? 'active',
       userId: json['user']?['id']?.toString() ?? '',
       userName: json['user']?['displayName'],
@@ -88,6 +98,7 @@ class ListingsController extends GetxController {
   var errorMessage = ''.obs;
 
   final client = http.Client();
+  final ImagePicker _picker = ImagePicker();
 
   Map<String, String> _getAuthHeaders() {
     final authController = Get.find<AuthController>();
@@ -108,6 +119,43 @@ class ListingsController extends GetxController {
     fetchCategories();
     fetchConditions();
     fetchListings();
+  }
+
+  /// Upload une photo sélectionnée sur le backend
+  Future<String?> uploadImage(XFile file) async {
+    try {
+      final authController = Get.find<AuthController>();
+      final uri = Uri.parse('$apiUrl/upload/image');
+      final request = http.MultipartRequest('POST', uri);
+
+      if (authController.authToken.value.isNotEmpty) {
+        request.headers['Authorization'] = 'Bearer ${authController.authToken.value}';
+      }
+
+      final bytes = await file.readAsBytes();
+      final multipartFile = http.MultipartFile.fromBytes(
+        'file',
+        bytes,
+        filename: file.name.isNotEmpty ? file.name : 'photo.jpg',
+      );
+      request.files.add(multipartFile);
+
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = jsonDecode(response.body);
+        final relativeUrl = data['data']?['url'];
+        if (relativeUrl != null) {
+          return relativeUrl.toString();
+        }
+      } else {
+        debugPrint('Upload failed with status: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('Error uploadImage: $e');
+    }
+    return null;
   }
 
   /// Récupération dynamique des villes (Story B5)

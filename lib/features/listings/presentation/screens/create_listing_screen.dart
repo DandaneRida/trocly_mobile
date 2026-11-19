@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../../controllers/listings_controller.dart';
 import '../../../../controllers/auth_controller.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -15,9 +16,14 @@ class CreateListingScreen extends StatefulWidget {
 class _CreateListingScreenState extends State<CreateListingScreen> {
   final ListingsController _listingsController = Get.find<ListingsController>();
   final AuthController _authController = Get.find<AuthController>();
+  final ImagePicker _picker = ImagePicker();
 
   int _step = 1;
   final int _totalSteps = 6;
+
+  // Photos
+  final List<String> _uploadedPhotoUrls = [];
+  bool _isUploadingPhoto = false;
 
   // Form controllers
   final _titleController = TextEditingController();
@@ -66,6 +72,45 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
     super.dispose();
   }
 
+  Future<void> _pickAndUploadImage({ImageSource source = ImageSource.gallery}) async {
+    if (_uploadedPhotoUrls.length >= 5) {
+      Get.snackbar('Limite atteinte', 'Vous pouvez ajouter 5 photos au maximum.');
+      return;
+    }
+
+    try {
+      final XFile? picked = await _picker.pickImage(
+        source: source,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 85,
+      );
+
+      if (picked != null) {
+        setState(() => _isUploadingPhoto = true);
+        final url = await _listingsController.uploadImage(picked);
+        if (url != null) {
+          setState(() {
+            _uploadedPhotoUrls.add(url);
+          });
+          Get.snackbar('Photo ajoutée', 'Photo téléchargée avec succès');
+        } else {
+          Get.snackbar('Erreur', 'Échec du téléchargement de la photo');
+        }
+      }
+    } catch (e) {
+      Get.snackbar('Erreur', 'Impossible de sélectionner la photo: $e');
+    } finally {
+      setState(() => _isUploadingPhoto = false);
+    }
+  }
+
+  void _removePhoto(int index) {
+    setState(() {
+      _uploadedPhotoUrls.removeAt(index);
+    });
+  }
+
   void _nextStep() {
     if (_step == 2 && _titleController.text.trim().isEmpty) {
       Get.snackbar('Attention', 'Veuillez saisir un titre pour votre annonce');
@@ -94,7 +139,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
       condition: _selectedCondition,
       estimatedValue: 0.0,
       city: _selectedCity,
-      photos: [],
+      photos: _uploadedPhotoUrls,
       attributes: _attributes,
       wishes: _wishController.text.trim().isNotEmpty
           ? [_wishController.text.trim()]
@@ -144,9 +189,12 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                   if (_step > 1) ...[
                     Expanded(
                       flex: 1,
-                      child: PrimaryButton(
-                        label: 'Retour',
-                        isOutlined: true,
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 50),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: const Text('Précédent'),
                         onPressed: _prevStep,
                       ),
                     ),
@@ -189,6 +237,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
 
   // 1. Photos
   Widget _step1Photos() {
+    final baseUrl = apiUrl;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -202,41 +251,95 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
           style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
         ),
         const SizedBox(height: 24),
-        Row(
+
+        // Grille de photos affichées
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
           children: [
-            Container(
-              width: 160,
-              height: 160,
-              decoration: BoxDecoration(
-                color: AppColors.divider,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
-                  Icon(Icons.add_a_photo_outlined, size: 36, color: AppColors.primary),
-                  SizedBox(height: 8),
-                  Text('Photo principale', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+            ..._uploadedPhotoUrls.asMap().entries.map((entry) {
+              final index = entry.key;
+              final path = entry.value;
+              final fullUrl = path.startsWith('http') ? path : '$baseUrl$path';
+              return Stack(
+                children: [
+                  Container(
+                    width: 100,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.border),
+                      image: DecorationImage(
+                        image: NetworkImage(fullUrl),
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    top: 4,
+                    right: 4,
+                    child: GestureDetector(
+                      onTap: () => _removePhoto(index),
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: Colors.black54,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.close, size: 14, color: Colors.white),
+                      ),
+                    ),
+                  ),
+                  if (index == 0)
+                    Positioned(
+                      bottom: 4,
+                      left: 4,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Text('Principale', style: TextStyle(color: Colors.white, fontSize: 9)),
+                      ),
+                    ),
                 ],
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Container(
-                height: 160,
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.border, style: BorderStyle.solid),
+              );
+            }),
+
+            // Bouton Ajouter
+            if (_uploadedPhotoUrls.length < 5)
+              GestureDetector(
+                onTap: _isUploadingPhoto ? null : () => _pickAndUploadImage(),
+                child: Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.border, style: BorderStyle.solid),
+                  ),
+                  child: _isUploadingPhoto
+                      ? const Center(
+                          child: SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      : Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            Icon(Icons.add_a_photo_outlined, size: 28, color: AppColors.primary),
+                            SizedBox(height: 6),
+                            Text('+ Photo', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                          ],
+                        ),
                 ),
-                child: const Center(
-                  child: Text('+ Ajouter (max 5)', style: TextStyle(fontSize: 12, color: AppColors.textHint)),
-                ),
               ),
-            ),
           ],
         ),
+
         const SizedBox(height: 24),
         Container(
           padding: const EdgeInsets.all(14),
@@ -248,10 +351,15 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: const [
-              Text('Conseils pour réussir votre troc :', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-              SizedBox(height: 6),
-              Text('• Utilisez la lumière naturelle\n• Montrez l\'objet sous plusieurs angles\n• Signalez honnêtement les petits défauts',
-                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.4)),
+              Text(
+                '💡 Conseils pour vos photos :',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary),
+              ),
+              SizedBox(height: 8),
+              Text(
+                '• Prenez l\'objet sous une bonne lumière naturelle\n• Montrez les détails et les éventuelles marques d\'usure\n• Évitez les photos floues ou trop sombres',
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.4),
+              ),
             ],
           ),
         ),
@@ -259,23 +367,26 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
     );
   }
 
-  // 2. Infos (Titre, Description)
+  // 2. Infos principales
   Widget _step2Infos() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Titre et description',
+          'Décrivez votre objet',
           style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 6),
+        const Text(
+          'Donnez envie aux autres troqueurs.',
+          style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+        ),
+        const SizedBox(height: 24),
         TextField(
           controller: _titleController,
           decoration: InputDecoration(
             labelText: 'Titre de l\'annonce *',
-            hintText: 'ex. Appareil photo vintage 35mm',
-            filled: true,
-            fillColor: AppColors.surface,
+            hintText: 'Ex: VTT Btwin Rockrider 520 taille M',
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           ),
         ),
@@ -285,11 +396,27 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
           maxLines: 4,
           decoration: InputDecoration(
             labelText: 'Description détaillée',
-            hintText: 'Précisez l\'état, les accessoires fournis, son histoire...',
-            filled: true,
-            fillColor: AppColors.surface,
+            hintText: 'Précisez l\'état, les accessoires fournis, la raison de l\'échange...',
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           ),
+        ),
+        const SizedBox(height: 16),
+        DropdownButtonFormField<String>(
+          value: _selectedCity,
+          decoration: InputDecoration(
+            labelText: 'Ville où l\'objet est disponible *',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          items: _listingsController.cities.isNotEmpty
+              ? _listingsController.cities
+                  .map((c) => DropdownMenuItem(value: c.name, child: Text(c.name)))
+                  .toList()
+              : ['Meknès', 'Fès', 'Rabat', 'Casablanca', 'Marrakech']
+                  .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                  .toList(),
+          onChanged: (val) {
+            if (val != null) setState(() => _selectedCity = val);
+          },
         ),
       ],
     );
@@ -301,17 +428,25 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Catégorie et état de l\'objet',
+          'Catégorie & État de l\'objet',
           style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
         ),
-        const SizedBox(height: 18),
-        const Text('Catégorie :', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
+        const Text(
+          'Permet un classement optimal dans le feed.',
+          style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+        ),
+        const SizedBox(height: 24),
+        const Text(
+          'Catégorie *',
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+        ),
+        const SizedBox(height: 10),
         Wrap(
           spacing: 8,
           runSpacing: 8,
           children: _categories.map((cat) {
-            final isSelected = cat == _selectedCategory;
+            final isSelected = _selectedCategory == cat;
             return ChoiceChip(
               label: Text(cat),
               selected: isSelected,
@@ -321,33 +456,31 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                 color: isSelected ? Colors.white : AppColors.primary,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
               ),
-              onSelected: (val) {
-                setState(() => _selectedCategory = cat);
-              },
+              onSelected: (_) => setState(() => _selectedCategory = cat),
             );
           }).toList(),
         ),
         const SizedBox(height: 24),
-        const Text('État général :', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-        const SizedBox(height: 8),
+        const Text(
+          'État du produit *',
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+        ),
+        const SizedBox(height: 10),
         Wrap(
           spacing: 8,
           runSpacing: 8,
           children: _conditions.map((cond) {
-            final isSelected = cond == _selectedCondition;
-            final label = cond.replaceAll('_', ' ');
+            final isSelected = _selectedCondition == cond;
             return ChoiceChip(
-              label: Text(label),
+              label: Text(cond.replaceAll('_', ' ')),
               selected: isSelected,
               selectedColor: AppColors.accent,
               backgroundColor: AppColors.surface,
               labelStyle: TextStyle(
-                color: isSelected ? Colors.white : AppColors.textPrimary,
+                color: isSelected ? Colors.white : AppColors.accent,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
               ),
-              onSelected: (val) {
-                setState(() => _selectedCondition = cond);
-              },
+              onSelected: (_) => setState(() => _selectedCondition = cond),
             );
           }).toList(),
         ),
@@ -355,27 +488,25 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
     );
   }
 
-  // 4. Caractéristiques variables (JSONB)
+  // 4. Attributs dynamiques (JSONB)
   Widget _step4Attributes() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Caractéristiques spécifiques (JSONB)',
+          'Caractéristiques spécifiques',
           style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
         ),
         const SizedBox(height: 6),
-        Text(
-          'Renseignez les attributs propres à $_selectedCategory.',
-          style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+        const Text(
+          'Facultatif : Renseignez la marque ou le modèle si applicable.',
+          style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 24),
         TextField(
           decoration: InputDecoration(
             labelText: 'Marque',
-            hintText: 'ex. Sony, Apple, Decathlon...',
-            filled: true,
-            fillColor: AppColors.surface,
+            hintText: 'Ex: Apple, Decathlon, Nike...',
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           ),
           onChanged: (val) => _attributes['marque'] = val,
@@ -383,10 +514,8 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
         const SizedBox(height: 16),
         TextField(
           decoration: InputDecoration(
-            labelText: 'Modèle',
-            hintText: 'ex. Alpha 7, iPhone 12...',
-            filled: true,
-            fillColor: AppColors.surface,
+            labelText: 'Modèle / Référence',
+            hintText: 'Ex: iPhone 13, Rockrider 520...',
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           ),
           onChanged: (val) => _attributes['modele'] = val,
@@ -395,29 +524,27 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
     );
   }
 
-  // 5. Liste de souhaits ("Je recherche")
+  // 5. Ce que vous recherchez en échange
   Widget _step5Wishes() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Ce que vous recherchez en échange',
+          'Que recherchez-vous en échange ?',
           style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
         ),
         const SizedBox(height: 6),
         const Text(
-          'Aidez les autres utilisateurs à vous proposer le bon objet.',
+          'Indiquez des idées ou laissez ouvert à toute proposition.',
           style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 24),
         TextField(
           controller: _wishController,
           maxLines: 3,
           decoration: InputDecoration(
-            labelText: 'Liste de souhaits',
-            hintText: 'ex. Je cherche un vélo de ville, une tablette ou une enceinte Bluetooth...',
-            filled: true,
-            fillColor: AppColors.surface,
+            labelText: 'Objets souhaités',
+            hintText: 'Ex: Trottinette, jeux PS5, matériel de camping ou ouvert...',
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           ),
         ),
@@ -425,22 +552,26 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
     );
   }
 
-  // 6. Ville & Récapitulatif
+  // 6. Récapitulatif
   Widget _step6Summary() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Récapitulatif & Publication',
+          'Vérifiez votre annonce',
           style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 6),
+        const Text(
+          'Votre annonce sera visible instantanément par la communauté.',
+          style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+        ),
+        const SizedBox(height: 20),
         Container(
-          width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: AppColors.surface,
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(color: AppColors.border),
           ),
           child: Column(
@@ -461,6 +592,10 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
               ),
               Text(
                 'Ville : $_selectedCity',
+                style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+              ),
+              Text(
+                'Photos : ${_uploadedPhotoUrls.length} ajoutée(s)',
                 style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
               ),
               if (_wishController.text.isNotEmpty) ...[
