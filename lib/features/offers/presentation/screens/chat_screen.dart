@@ -3,7 +3,7 @@ import 'package:get/get.dart';
 import '../../../../controllers/chat_controller.dart';
 import '../../../../controllers/offers_controller.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/widgets/primary_button.dart';
+import '../../../../core/theme/app_theme.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({Key? key}) : super(key: key);
@@ -16,15 +16,18 @@ class _ChatScreenState extends State<ChatScreen> {
   final ChatController _chatController = Get.find<ChatController>();
   final OffersController _offersController = Get.find<OffersController>();
   final _textController = TextEditingController();
+  final _scrollController = ScrollController();
 
   String? _offerId;
-  dynamic _conversation;
+  ConversationModel? _conversation;
 
   @override
   void initState() {
     super.initState();
     _offerId = Get.parameters['offerId'];
-    _conversation = Get.arguments;
+    if (Get.arguments is ConversationModel) {
+      _conversation = Get.arguments as ConversationModel;
+    }
     if (_offerId != null) {
       _chatController.loadMessages(_offerId!);
       _chatController.connectWebSocket(_offerId!);
@@ -35,6 +38,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void dispose() {
     _chatController.disconnectWebSocket();
     _textController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -42,232 +46,371 @@ class _ChatScreenState extends State<ChatScreen> {
     final text = _textController.text.trim();
     if (text.isEmpty || _offerId == null) return;
     _chatController.sendMessage(_offerId!, text);
+    _chatController.setTyping(_offerId!, false);
     _textController.clear();
   }
 
   @override
   Widget build(BuildContext context) {
+    final otherName = _conversation?.otherUserName ?? 'Conversation';
+    final initials = otherName
+        .split(' ')
+        .where((p) => p.isNotEmpty)
+        .take(2)
+        .map((p) => p[0].toUpperCase())
+        .join();
+    final status = _conversation?.offerStatus ?? 'pending';
+    final soulte = _conversation?.soulte ?? 0;
+
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.paper,
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 19),
+          onPressed: () => Get.back(),
+        ),
+        titleSpacing: 0,
+        title: Row(
           children: [
-            Text(
-              _conversation?.otherUserName ?? 'Discussion de troc',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            CircleAvatar(
+              radius: 17,
+              backgroundColor: AppColors.bubble,
+              child: Text(
+                initials.isEmpty ? 'T' : initials,
+                style: AppTypography.sans(size: 12, weight: FontWeight.w600),
+              ),
             ),
-            const Text(
-              'Expire 22h après proposition',
-              style: TextStyle(fontSize: 11, color: Colors.white70),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(otherName, style: AppTypography.sans(size: 14.5, weight: FontWeight.w600)),
+                  Obx(() => Text(
+                        _chatController.isConnected.value ? 'En ligne · temps réel' : 'Connexion…',
+                        style: AppTypography.sans(
+                          size: 11,
+                          color: _chatController.isConnected.value
+                              ? AppColors.success
+                              : AppColors.textHint,
+                        ),
+                      )),
+                ],
+              ),
             ),
           ],
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.event_available_rounded),
-            tooltip: 'Planifier RDV',
+            icon: const Icon(Icons.calendar_today_outlined, size: 20),
+            tooltip: 'Proposer un rendez-vous',
             onPressed: () {
-              Get.toNamed('/plan-meeting/$_offerId');
+              if (_offerId != null) {
+                Get.toNamed('/plan-meeting/$_offerId', arguments: {
+                  'offerId': _offerId,
+                  'responderId': _conversation?.otherUserId,
+                  'otherUserName': otherName,
+                });
+              }
             },
           ),
         ],
+        bottom: const PreferredSize(
+          preferredSize: Size.fromHeight(1),
+          child: Divider(height: 1),
+        ),
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Status bar (Offre envoyée -> Contre-offre -> Acceptée)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      body: Column(
+        children: [
+          // Pinned offer summary card (matching Phone 5 of v3 mockup)
+          Container(
+            margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            padding: const EdgeInsets.all(13),
+            decoration: BoxDecoration(
               color: AppColors.surface,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _stepBadge('Offre envoyée', true),
-                  const Icon(Icons.arrow_forward, size: 14, color: AppColors.textHint),
-                  _stepBadge('Négociation', true),
-                  const Icon(Icons.arrow_forward, size: 14, color: AppColors.textHint),
-                  _stepBadge('Acceptée', false),
-                ],
-              ),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.line),
             ),
-            // Pinned Offer card dock
-            Container(
-              margin: const EdgeInsets.all(12),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.primary, width: 1.5),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: const [
-                      Text(
-                        'PROPOSITION DE TROC',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primary),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      status == 'accepted'
+                          ? 'OFFRE ACCEPTÉE'
+                          : status == 'countered'
+                              ? 'CONTRE-PROPOSITION'
+                              : 'PROPOSITION EN COURS',
+                      style: AppTypography.eyebrow(
+                        color: status == 'accepted' ? AppColors.success : AppColors.accent,
                       ),
+                    ),
+                    if (soulte > 0)
                       Text(
-                        'Soulte à convenir',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.accent),
+                        '+ ${soulte.toStringAsFixed(0)} DH',
+                        style: AppTypography.sans(
+                          size: 12,
+                          weight: FontWeight.w600,
+                          color: AppColors.ink,
+                        ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Appareil photo contre Poterie artisanale',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-                  ),
-                  const SizedBox(height: 10),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  (_conversation?.itemSummary.isNotEmpty ?? false)
+                      ? _conversation!.itemSummary
+                      : 'Échange en cours de négociation',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.sans(size: 13.5, weight: FontWeight.w500),
+                ),
+                const SizedBox(height: 11),
+                if (status == 'accepted')
+                  SizedBox(
+                    height: 36,
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Get.toNamed('/plan-meeting/$_offerId', arguments: {
+                          'offerId': _offerId,
+                          'responderId': _conversation?.otherUserId,
+                          'otherUserName': otherName,
+                        });
+                      },
+                      icon: const Icon(Icons.calendar_today_outlined, size: 15),
+                      label: const Text('Planifier le rendez-vous QR'),
+                    ),
+                  )
+                else
                   Row(
                     children: [
                       Expanded(
-                        child: OutlinedButton(
-                          onPressed: () {
+                        child: _compactBtn(
+                          label: 'Refuser',
+                          borderColor: AppColors.line,
+                          fg: AppColors.textSecondary,
+                          onTap: () async {
                             if (_offerId != null) {
-                              _offersController.rejectOffer(_offerId!);
+                              await _offersController.rejectOffer(_offerId!);
                             }
                           },
-                          style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: AppColors.error),
-                            foregroundColor: AppColors.error,
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                          ),
-                          child: const Text('Refuser'),
                         ),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
-                        child: ElevatedButton(
-                          onPressed: () {
+                        child: _compactBtn(
+                          label: 'RDV',
+                          borderColor: AppColors.ink,
+                          fg: AppColors.ink,
+                          onTap: () {
                             if (_offerId != null) {
-                              _offersController.acceptOffer(_offerId!);
-                              Get.snackbar('Succès', 'Offre acceptée ! Vous pouvez maintenant planifier le RDV.');
+                              Get.toNamed('/plan-meeting/$_offerId', arguments: {
+                                'offerId': _offerId,
+                                'responderId': _conversation?.otherUserId,
+                                'otherUserName': otherName,
+                              });
                             }
                           },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                          ),
-                          child: const Text('Accepter', style: TextStyle(color: Colors.white)),
                         ),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
-                        child: ElevatedButton(
-                          onPressed: () {
-                            Get.toNamed('/plan-meeting/$_offerId');
+                        child: _compactBtn(
+                          label: 'Accepter',
+                          bg: AppColors.ink,
+                          fg: Colors.white,
+                          onTap: () async {
+                            if (_offerId != null) {
+                              await _offersController.acceptOffer(_offerId!);
+                            }
                           },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.accent,
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                          ),
-                          child: const Text('RDV 📍', style: TextStyle(color: Colors.white)),
                         ),
                       ),
                     ],
                   ),
-                ],
-              ),
+              ],
             ),
-            // Messages list
-            Expanded(
-              child: Obx(() {
-                final messages = _chatController.messages;
-                if (messages.isEmpty) {
-                  return const Center(
-                    child: Text('Commencez la discussion...', style: TextStyle(color: AppColors.textHint)),
-                  );
-                }
+          ),
 
-                return ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  itemCount: messages.length,
-                  itemBuilder: (ctx, idx) {
-                    final msg = messages[idx];
-                    final isMe = msg.isMe;
+          // Messages stream
+          Expanded(
+            child: Obx(() {
+              final messages = _chatController.messages;
+              final typing = _chatController.typingUsers;
 
-                    return Align(
-                      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
-                        decoration: BoxDecoration(
-                          color: isMe ? AppColors.accentLight : AppColors.surface,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: isMe ? AppColors.accent.withOpacity(0.3) : AppColors.border),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              msg.content,
-                              style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              msg.timestampStr,
-                              style: const TextStyle(fontSize: 10, color: AppColors.textHint),
-                            ),
-                          ],
-                        ),
+              if (messages.isEmpty && !_chatController.isLoading.value) {
+                return Center(
+                  child: Text(
+                    'Envoyez un premier message pour convenir des détails.',
+                    style: AppTypography.sans(size: 13, color: AppColors.textHint),
+                  ),
+                );
+              }
+
+              return ListView.builder(
+                controller: _scrollController,
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+                itemCount: messages.length + (typing.isNotEmpty ? 1 : 0),
+                itemBuilder: (ctx, idx) {
+                  if (idx == messages.length) {
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        '$otherName est en train d\'écrire…',
+                        style: AppTypography.sans(size: 11.5, color: AppColors.textHint),
                       ),
                     );
-                  },
-                );
-              }),
+                  }
+
+                  final msg = messages[idx];
+                  final isMe = msg.isMe;
+
+                  return Align(
+                    alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+                      constraints: BoxConstraints(
+                        maxWidth: MediaQuery.of(context).size.width * 0.76,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isMe ? AppColors.ink : AppColors.bubble,
+                        borderRadius: BorderRadius.only(
+                          topLeft: const Radius.circular(16),
+                          topRight: const Radius.circular(16),
+                          bottomLeft: Radius.circular(isMe ? 16 : 4),
+                          bottomRight: Radius.circular(isMe ? 4 : 16),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment:
+                            isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            msg.content,
+                            style: AppTypography.sans(
+                              size: 13.5,
+                              color: isMe ? Colors.white : AppColors.ink,
+                              height: 1.35,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            msg.timestampStr,
+                            style: AppTypography.sans(
+                              size: 10,
+                              color: isMe ? Colors.white60 : AppColors.textHint,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              );
+            }),
+          ),
+
+          // Composer bar
+          Container(
+            decoration: const BoxDecoration(
+              color: AppColors.surface,
+              border: Border(top: BorderSide(color: AppColors.line)),
             ),
-            // Message input field
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: const BoxDecoration(
-                color: AppColors.surface,
-                border: Border(top: BorderSide(color: AppColors.border)),
-              ),
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+            child: SafeArea(
+              top: false,
               child: Row(
                 children: [
+                  IconButton(
+                    icon: const Icon(Icons.calendar_today_outlined, size: 20, color: AppColors.textSecondary),
+                    onPressed: () {
+                      if (_offerId != null) {
+                        Get.toNamed('/plan-meeting/$_offerId', arguments: {
+                          'offerId': _offerId,
+                          'responderId': _conversation?.otherUserId,
+                          'otherUserName': otherName,
+                        });
+                      }
+                    },
+                  ),
                   Expanded(
                     child: TextField(
                       controller: _textController,
+                      onChanged: (v) {
+                        if (_offerId != null) {
+                          _chatController.setTyping(_offerId!, v.trim().isNotEmpty);
+                        }
+                      },
+                      onSubmitted: (_) => _sendMessage(),
                       decoration: InputDecoration(
-                        hintText: 'Écrire un message...',
-                        hintStyle: const TextStyle(color: AppColors.textHint, fontSize: 13),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        hintText: 'Message',
                         filled: true,
-                        fillColor: AppColors.background,
+                        fillColor: AppColors.paper,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(24),
                           borderSide: BorderSide.none,
                         ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(24),
+                          borderSide: BorderSide.none,
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(24),
+                          borderSide: const BorderSide(color: AppColors.line),
+                        ),
                       ),
-                      onSubmitted: (_) => _sendMessage(),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  IconButton(
-                    icon: const Icon(Icons.send_rounded, color: AppColors.primary),
-                    onPressed: _sendMessage,
+                  InkWell(
+                    onTap: _sendMessage,
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: const BoxDecoration(
+                        color: AppColors.ink,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.arrow_forward_rounded, size: 19, color: Colors.white),
+                    ),
                   ),
                 ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _stepBadge(String label, bool isDone) {
-    return Text(
-      label,
-      style: TextStyle(
-        fontSize: 11,
-        fontWeight: isDone ? FontWeight.bold : FontWeight.normal,
-        color: isDone ? AppColors.primary : AppColors.textHint,
+  Widget _compactBtn({
+    required String label,
+    Color? bg,
+    Color? borderColor,
+    required Color fg,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        height: 34,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: bg ?? Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          border: borderColor != null ? Border.all(color: borderColor) : null,
+        ),
+        child: Text(
+          label,
+          style: AppTypography.sans(size: 12.5, weight: FontWeight.w600, color: fg),
+        ),
       ),
     );
   }
