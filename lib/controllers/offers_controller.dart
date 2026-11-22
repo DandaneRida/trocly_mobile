@@ -129,15 +129,19 @@ class OffersController extends GetxController {
     }
   }
 
-  /// C1 - Create multi-object offer with optional soulte (JWT authenticated)
+  /// C1 - Create multi-object offer (JWT authenticated, mandatory >= 1 item, soultePossible boolean)
   Future<OfferModel?> createOffer({
-    String? initiatorId,
-    String? responderId,
     required String targetListingId,
     required List<String> offeringListingIds,
-    double? soulte,
+    bool soultePossible = false,
     String? message,
   }) async {
+    if (offeringListingIds.isEmpty) {
+      errorMessage.value = 'Veuillez sélectionner au moins un objet à échanger.';
+      Get.snackbar('Attention', errorMessage.value);
+      return null;
+    }
+
     isLoading.value = true;
     errorMessage.value = '';
     try {
@@ -147,13 +151,12 @@ class OffersController extends GetxController {
         body: jsonEncode({
           'targetListingId': targetListingId,
           'offeringListingIds': offeringListingIds,
-          if (soulte != null && soulte > 0) 'soulte': soulte,
+          'soultePossible': soultePossible,
           if (message != null && message.isNotEmpty) 'message': message,
         }),
       );
       if (resp.statusCode == 200 || resp.statusCode == 201) {
         final offer = OfferModel.fromJson(jsonDecode(resp.body));
-        Get.snackbar('Proposition envoyée', 'Le propriétaire a été notifié.');
         return offer;
       } else {
         final err = jsonDecode(resp.body);
@@ -218,7 +221,7 @@ class OffersController extends GetxController {
     }
   }
 
-  /// C2 - Create counter-offer
+  /// C2 - Counter-offer
   Future<OfferModel?> createCounterOffer({
     required String originalOfferId,
     required List<String> counterListingIds,

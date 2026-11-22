@@ -207,11 +207,20 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
             : ['Ouvert aux propositions'],
       );
       if (success && mounted) {
-        if (Navigator.of(context).canPop()) {
-          Get.back(result: true);
-        } else {
-          Get.offAllNamed('/feed');
-        }
+        Get.offNamed('/my-listings', arguments: {
+          'justPublished': true,
+          'city': _selectedCity,
+          'title': _titleController.text.trim(),
+        });
+        Get.snackbar(
+          'Annonce publiée !',
+          'Votre annonce "${_titleController.text.trim()}" est maintenant visible à $_selectedCity.',
+          backgroundColor: AppColors.success,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 4),
+        );
+      } else if (mounted && _listingsController.errorMessage.value.isNotEmpty) {
+        setState(() => _duplicateError = _listingsController.errorMessage.value);
       }
     } finally {
       if (mounted) setState(() => _isPublishing = false);
@@ -627,6 +636,36 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
         const Divider(),
         _reviewRow('Photos', '${_uploadedPhotoUrls.length} ajoutée(s)'),
         const Divider(),
+        if (_duplicateError != null) ...[
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.errorLight,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.error),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Annonce similaire détectée (Règle B2)',
+                  style: AppTypography.sans(
+                    size: 13,
+                    weight: FontWeight.w700,
+                    color: AppColors.error,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _duplicateError!,
+                  style: AppTypography.sans(size: 12.5, color: AppColors.error),
+                ),
+              ],
+            ),
+          ),
+        ],
       ],
     );
   }

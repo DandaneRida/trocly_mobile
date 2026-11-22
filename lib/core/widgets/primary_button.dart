@@ -58,12 +58,16 @@ class PrimaryButton extends StatelessWidget {
                       Icon(icon, size: 17, color: fg),
                       const SizedBox(width: 8),
                     ],
-                    Text(
-                      label,
-                      style: AppTypography.sans(
-                        size: 14,
-                        weight: FontWeight.w600,
-                        color: fg,
+                    Flexible(
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTypography.sans(
+                          size: 14,
+                          weight: FontWeight.w600,
+                          color: fg,
+                        ),
                       ),
                     ),
                   ],
@@ -104,12 +108,16 @@ class PrimaryButton extends StatelessWidget {
                     Icon(icon, size: 17, color: fg),
                     const SizedBox(width: 8),
                   ],
-                  Text(
-                    label,
-                    style: AppTypography.sans(
-                      size: 14,
-                      weight: FontWeight.w600,
-                      color: fg,
+                  Flexible(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.sans(
+                        size: 14,
+                        weight: FontWeight.w600,
+                        color: fg,
+                      ),
                     ),
                   ),
                 ],

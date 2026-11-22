@@ -18,10 +18,16 @@ class _MyListingsScreenState extends State<MyListingsScreen>
   late TabController _tabController;
 
   final List<String> _statuses = ['active', 'archived', 'exchanged'];
+  String? _publishedBannerText;
 
   @override
   void initState() {
     super.initState();
+    if (Get.arguments is Map && (Get.arguments as Map)['justPublished'] == true) {
+      final args = Get.arguments as Map;
+      final city = args['city'] ?? 'votre ville';
+      _publishedBannerText = 'Annonce publiée ! Visible à $city.';
+    }
     _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) {
@@ -101,12 +107,46 @@ class _MyListingsScreenState extends State<MyListingsScreen>
           ),
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
+      body: Column(
         children: [
-          _buildListingsList('active'),
-          _buildListingsList('archived'),
-          _buildListingsList('exchanged'),
+          if (_publishedBannerText != null)
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.fromLTRB(20, 14, 20, 4),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: AppColors.successLight,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.success),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle_outline_rounded,
+                      size: 18, color: AppColors.success),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      _publishedBannerText!,
+                      style: AppTypography.sans(
+                        size: 13,
+                        weight: FontWeight.w600,
+                        color: AppColors.success,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildListingsList('active'),
+                _buildListingsList('archived'),
+                _buildListingsList('exchanged'),
+              ],
+            ),
+          ),
         ],
       ),
     );

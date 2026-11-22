@@ -147,7 +147,9 @@ class _FeedScreenState extends State<FeedScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.paper,
-      bottomNavigationBar: const TroclyBottomNav(currentIndex: 0),
+      bottomNavigationBar: Obx(() => _authController.authToken.value.isNotEmpty
+          ? const TroclyBottomNav(currentIndex: 0)
+          : const SizedBox.shrink()),
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: () => _listingsController.fetchListings(),

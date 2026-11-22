@@ -301,26 +301,39 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
             child: SafeArea(
               top: false,
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 112,
-                    child: PrimaryButton(
-                      label: 'Message',
-                      isOutlined: true,
-                      onPressed: _onProposeTroc,
+              child: Obx(() {
+                final isOwner = _authController.userId.value.isNotEmpty &&
+                    item.userId.isNotEmpty &&
+                    item.userId == _authController.userId.value;
+                if (isOwner) {
+                  return PrimaryButton(
+                    label: 'Gérer mon annonce',
+                    icon: Icons.edit_outlined,
+                    isOutlined: true,
+                    onPressed: () => Get.toNamed('/my-listings'),
+                  );
+                }
+                return Row(
+                  children: [
+                    SizedBox(
+                      width: 112,
+                      child: PrimaryButton(
+                        label: 'Message',
+                        isOutlined: true,
+                        onPressed: _onProposeTroc,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: PrimaryButton(
-                      label: 'Proposer un échange',
-                      icon: Icons.swap_horiz_rounded,
-                      onPressed: _onProposeTroc,
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: PrimaryButton(
+                        label: 'Proposer un troc',
+                        icon: Icons.swap_horiz_rounded,
+                        onPressed: _onProposeTroc,
+                      ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                );
+              }),
             ),
           ),
         ],

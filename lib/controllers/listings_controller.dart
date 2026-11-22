@@ -351,29 +351,22 @@ class ListingsController extends GetxController {
       );
 
       if (response.statusCode == 201 || response.statusCode == 200) {
-        Get.snackbar(
-          'Succès',
-          'Votre annonce a été publiée avec succès !',
-          backgroundColor: Colors.green,
-          colorText: Colors.white,
-        );
+        errorMessage.value = '';
         await fetchListings();
+        await fetchMyListings(status: 'active');
         return true;
       } else if (response.statusCode == 409) {
         final err = jsonDecode(response.body);
-        Get.snackbar(
-          'Annonce existante (Règle B2)',
-          err['message'] ?? 'Vous avez déjà une annonce identique active.',
-          backgroundColor: Colors.orange,
-          colorText: Colors.white,
-          duration: const Duration(seconds: 4),
-        );
+        errorMessage.value = err['message']?.toString() ??
+            'Annonce similaire détectée : vous possédez déjà une annonce active identique.';
         return false;
       } else {
         final err = jsonDecode(response.body);
+        errorMessage.value =
+            err['message']?.toString() ?? 'Impossible de publier l\'annonce';
         Get.snackbar(
           'Erreur',
-          err['message'] ?? 'Impossible de publier l\'annonce',
+          errorMessage.value,
           backgroundColor: Colors.red,
           colorText: Colors.white,
         );
