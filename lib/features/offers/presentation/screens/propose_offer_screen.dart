@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../../controllers/listings_controller.dart';
 import '../../../../controllers/offers_controller.dart';
-import '../../../../controllers/auth_controller.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/primary_button.dart';
 
 class ProposeOfferScreen extends StatefulWidget {
@@ -18,253 +18,372 @@ class _ProposeOfferScreenState extends State<ProposeOfferScreen> {
   final ListingsController _listingsController = Get.find<ListingsController>();
 
   ListingModel? _targetListing;
-  final Set<String> _selectedMyListingIds = {};
-  bool _soultePossible = false;
+  final Set<String> _selectedIds = {};
+  int _soulteMode = 0; // 0: Aucune, 1: Je verse, 2: Je reçois
+  final _soulteController = TextEditingController();
   final _messageController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _targetListing = Get.arguments as ListingModel?;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _listingsController.fetchMyListings(status: 'active');
+    });
   }
 
   @override
   void dispose() {
+    _soulteController.dispose();
     _messageController.dispose();
     super.dispose();
   }
 
-  void _submitOffer() {
+  double get _soulteAmount {
+    if (_soulteMode == 0) return 0;
+    return double.tryParse(_soulteController.text.trim()) ?? 0;
+  }
+
+  String get _summaryLine {
+    final myItems = _listingsController.myListings
+        .where((l) => _selectedIds.contains(l.id))
+        .map((l) => l.title)
+        .toList();
+    if (myItems.isEmpty) {
+      return 'Sélectionnez au moins un objet ci-dessus';
+    }
+    final itemsStr = myItems.length == 1
+        ? myItems.first
+        : '${myItems.length} objets';
+    final soulteStr = _soulteAmount > 0
+        ? (_soulteMode == 1
+            ? ' + ${_soulteAmount.toStringAsFixed(0)} DH'
+            : ' (soulte demandée ${_soulteAmount.toStringAsFixed(0)} DH)')
+        : '';
+    return '$itemsStr$soulteStr contre ${_targetListing?.title ?? 'cet objet'}';
+  }
+
+  Future<void> _submit() async {
     if (_targetListing == null) return;
-    if (_selectedMyListingIds.isEmpty) {
-      Get.snackbar('Attention', 'Veuillez sélectionner au moins un de vos objets à échanger.');
+    if (_selectedIds.isEmpty) {
+      Get.snackbar('Attention', 'Sélectionnez au moins un de vos objets.');
       return;
     }
 
-    final authController = Get.find<AuthController>();
-    _offersController.createOffer(
-      initiatorId: authController.phone.value,
-      responderId: _targetListing!.userId,
+    final offer = await _offersController.createOffer(
       targetListingId: _targetListing!.id,
-      offeringListingIds: _selectedMyListingIds.toList(),
-      soulte: _soultePossible ? 1.0 : 0.0,
+      offeringListingIds: _selectedIds.toList(),
+      soulte: _soulteAmount > 0 ? _soulteAmount : null,
       message: _messageController.text.trim(),
     );
+
+    if (offer != null) {
+      Get.offNamed('/chat/${offer.id}');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.paper,
       appBar: AppBar(
-        title: const Text('Votre proposition'),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 19),
           onPressed: () => Get.back(),
         ),
+        title: Text('Votre proposition', style: AppTypography.sans(size: 16, weight: FontWeight.w600)),
+        bottom: const PreferredSize(
+          preferredSize: Size.fromHeight(1),
+          child: Divider(height: 1),
+        ),
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Target item pinned card
-                    if (_targetListing != null) ...[
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: AppColors.surface,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.primary, width: 1.5),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 56,
-                              height: 56,
-                              decoration: BoxDecoration(
-                                color: AppColors.divider,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Icon(Icons.swap_horizontal_circle, color: AppColors.primary),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'VOUS SOUHAITEZ OBTENIR',
-                                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.primary),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    _targetListing!.title,
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                                  ),
-                                  Text(
-                                    '${_targetListing!.condition} · ${_targetListing!.city}',
-                                    style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                    ],
-                    // My Listings multi-selection
-                    const Text(
-                      'Sélectionnez vos objets à proposer en échange',
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-                    ),
-                    const SizedBox(height: 6),
-                    const Text(
-                      'Vous pouvez sélectionner un ou plusieurs objets (multi-objets).',
-                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                    ),
-                    const SizedBox(height: 12),
-                    Obx(() {
-                      final myList = _listingsController.listings;
-                      if (myList.isEmpty) {
-                        return Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: AppColors.surface,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppColors.border),
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Target item row (matching Phone 4 of v3 mockup)
+                  if (_targetListing != null) ...[
+                    Row(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            width: 52,
+                            height: 52,
+                            color: AppColors.imagePlaceholder,
+                            child: _targetListing!.photos.isNotEmpty
+                                ? Image.network(_targetListing!.photos.first, fit: BoxFit.cover)
+                                : const Icon(Icons.photo_outlined, color: AppColors.textHint),
                           ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
                           child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Vous n\'avez pas encore d\'annonces actives.'),
-                              const SizedBox(height: 8),
-                              TextButton(
-                                onPressed: () => Get.toNamed('/publish'),
-                                child: const Text('Publier un objet d\'abord'),
+                              Text('Vous souhaitez', style: AppTypography.sans(size: 11.5, color: AppColors.textHint)),
+                              const SizedBox(height: 2),
+                              Text(
+                                _targetListing!.title,
+                                style: AppTypography.sans(size: 14, weight: FontWeight.w600),
                               ),
                             ],
                           ),
-                        );
-                      }
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    const Divider(),
+                    const SizedBox(height: 16),
+                  ],
 
-                      return ListView.separated(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: myList.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 8),
-                        itemBuilder: (ctx, idx) {
-                          final myItem = myList[idx];
-                          final isChecked = _selectedMyListingIds.contains(myItem.id);
-                          return Container(
-                            decoration: BoxDecoration(
-                              color: AppColors.surface,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: isChecked ? AppColors.primary : AppColors.border,
-                                width: isChecked ? 1.5 : 1,
-                              ),
+                  // Section header
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Text('Ce que vous proposez', style: AppTypography.serif(size: 20)),
+                      Text(
+                        '${_selectedIds.length} sélectionné(s)',
+                        style: AppTypography.sans(size: 11.5, color: AppColors.textHint),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+
+                  // My active listings checklist
+                  Obx(() {
+                    if (_listingsController.isMyListingsLoading.value) {
+                      return const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 28),
+                        child: Center(
+                          child: CircularProgressIndicator(color: AppColors.ink, strokeWidth: 2),
+                        ),
+                      );
+                    }
+                    final myItems = _listingsController.myListings;
+                    if (myItems.isEmpty) {
+                      return Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(18),
+                        margin: const EdgeInsets.symmetric(vertical: 8),
+                        decoration: BoxDecoration(
+                          color: AppColors.surface,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: AppColors.line),
+                        ),
+                        child: Column(
+                          children: [
+                            Text(
+                              'Vous n\'avez aucune annonce active à proposer.',
+                              style: AppTypography.sans(size: 13, color: AppColors.textSecondary),
                             ),
-                            child: CheckboxListTile(
-                              value: isChecked,
-                              activeColor: AppColors.primary,
-                              title: Text(myItem.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                              subtitle: Text('${myItem.condition} · ${myItem.city}', style: const TextStyle(fontSize: 11)),
-                              secondary: Container(
-                                width: 44,
-                                height: 44,
-                                decoration: BoxDecoration(
-                                  color: AppColors.divider,
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: const Icon(Icons.image_outlined, size: 24, color: AppColors.textSecondary),
-                              ),
-                              onChanged: (val) {
+                            const SizedBox(height: 10),
+                            OutlinedButton(
+                              onPressed: () async {
+                                final res = await Get.toNamed('/publish');
+                                if (res == true) {
+                                  _listingsController.fetchMyListings(status: 'active');
+                                }
+                              },
+                              child: const Text('Publier un objet d\'abord'),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    return Column(
+                      children: myItems.map((item) {
+                        final checked = _selectedIds.contains(item.id);
+                        return Column(
+                          children: [
+                            InkWell(
+                              onTap: () {
                                 setState(() {
-                                  if (val == true) {
-                                    _selectedMyListingIds.add(myItem.id);
+                                  if (checked) {
+                                    _selectedIds.remove(item.id);
                                   } else {
-                                    _selectedMyListingIds.remove(myItem.id);
+                                    _selectedIds.add(item.id);
                                   }
                                 });
                               },
-                            ),
-                          );
-                        },
-                      );
-                    }),
-                    const SizedBox(height: 16),
-                    // Soulte possible toggle
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: const [
-                                Text('Soulte possible', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                                SizedBox(height: 2),
-                                Text(
-                                  'Si oui, le montant se discute dans le chat (aucun montant fixe stocké).',
-                                  style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                child: Row(
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Container(
+                                        width: 48,
+                                        height: 48,
+                                        color: AppColors.imagePlaceholder,
+                                        child: item.photos.isNotEmpty
+                                            ? Image.network(item.photos.first, fit: BoxFit.cover)
+                                            : const Icon(Icons.photo_outlined, size: 20, color: AppColors.textHint),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(item.title,
+                                              style: AppTypography.sans(size: 13.5, weight: FontWeight.w500)),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            '${item.condition} · ${item.city}',
+                                            style: AppTypography.sans(size: 11.5, color: AppColors.textHint),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Container(
+                                      width: 22,
+                                      height: 22,
+                                      decoration: BoxDecoration(
+                                        color: checked ? AppColors.ink : Colors.transparent,
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(
+                                          color: checked ? AppColors.ink : AppColors.borderStrong,
+                                        ),
+                                      ),
+                                      child: checked
+                                          ? const Icon(Icons.check_rounded, size: 15, color: Colors.white)
+                                          : null,
+                                    ),
+                                  ],
                                 ),
-                              ],
+                              ),
                             ),
-                          ),
-                          Switch(
-                            value: _soultePossible,
-                            activeColor: AppColors.accent,
-                            onChanged: (val) {
-                              setState(() => _soultePossible = val);
-                            },
-                          ),
-                        ],
-                      ),
+                            const Divider(),
+                          ],
+                        );
+                      }).toList(),
+                    );
+                  }),
+
+                  const SizedBox(height: 18),
+
+                  // Soulte segmented control (matching Phone 4 of v3 mockup)
+                  Text(
+                    'Soulte (facultatif)',
+                    style: AppTypography.sans(
+                      size: 12.5,
+                      weight: FontWeight.w500,
+                      color: AppColors.textSecondary,
                     ),
-                    const SizedBox(height: 16),
-                    // Message
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(
+                      color: AppColors.segmentedBg,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        _segment('Aucune', 0),
+                        _segment('Je verse', 1),
+                        _segment('Je reçois', 2),
+                      ],
+                    ),
+                  ),
+                  if (_soulteMode != 0) ...[
+                    const SizedBox(height: 10),
                     TextField(
-                      controller: _messageController,
-                      maxLines: 3,
+                      controller: _soulteController,
+                      keyboardType: TextInputType.number,
+                      onChanged: (_) => setState(() {}),
                       decoration: InputDecoration(
-                        labelText: 'Message pour le propriétaire',
-                        hintText: 'Bonjour, votre annonce m\'intéresse. Seriez-vous d\'accord pour cet échange ?',
-                        filled: true,
-                        fillColor: AppColors.surface,
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        hintText: '200',
+                        suffixText: 'DH',
+                        suffixStyle: AppTypography.sans(size: 13, color: AppColors.textHint),
                       ),
                     ),
                   ],
-                ),
+
+                  const SizedBox(height: 18),
+                  Text(
+                    'Message (facultatif)',
+                    style: AppTypography.sans(
+                      size: 12.5,
+                      weight: FontWeight.w500,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _messageController,
+                    maxLines: 3,
+                    decoration: const InputDecoration(
+                      hintText: 'Précisez l\'état de vos objets ou vos disponibilités…',
+                    ),
+                  ),
+                ],
               ),
             ),
-            // Bottom Submit Button
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: const BoxDecoration(
-                color: AppColors.surface,
-                border: Border(top: BorderSide(color: AppColors.border)),
-              ),
-              child: Obx(
-                () => PrimaryButton(
-                  label: 'Envoyer la proposition',
-                  icon: Icons.send_rounded,
-                  isLoading: _offersController.isLoading.value,
-                  onPressed: _submitOffer,
-                ),
+          ),
+
+          // Sticky summary + CTA
+          Container(
+            decoration: const BoxDecoration(
+              color: AppColors.paper,
+              border: Border(top: BorderSide(color: AppColors.line)),
+            ),
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
+            child: SafeArea(
+              top: false,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _summaryLine,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTypography.sans(size: 12, color: AppColors.textSecondary),
+                  ),
+                  const SizedBox(height: 8),
+                  Obx(() => PrimaryButton(
+                        label: 'Envoyer la proposition',
+                        isLoading: _offersController.isLoading.value,
+                        onPressed: _submit,
+                      )),
+                ],
               ),
             ),
-          ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _segment(String label, int mode) {
+    final active = _soulteMode == mode;
+    return Expanded(
+      child: InkWell(
+        onTap: () => setState(() => _soulteMode = mode),
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: active ? AppColors.surface : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: AppTypography.sans(
+              size: 12.5,
+              weight: active ? FontWeight.w600 : FontWeight.w400,
+              color: active ? AppColors.ink : AppColors.textSecondary,
+            ),
+          ),
         ),
       ),
     );
