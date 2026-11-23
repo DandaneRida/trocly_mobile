@@ -6,6 +6,8 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/auth_guard_bottom_sheet.dart';
 import '../../../../core/widgets/primary_button.dart';
+import '../../../../core/widgets/trocly_bottom_nav.dart';
+import '../../../../core/widgets/trocly_brand_header.dart';
 
 class ListingDetailScreen extends StatefulWidget {
   const ListingDetailScreen({Key? key}) : super(key: key);
@@ -63,7 +65,8 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
   Widget build(BuildContext context) {
     if (_listing == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Annonce')),
+        bottomNavigationBar: const TroclyBottomNav(currentIndex: 0),
+        appBar: AppBar(title: const TroclyAppBarTitle(pageTitle: 'Annonce')),
         body: const Center(child: Text('Annonce introuvable')),
       );
     }
@@ -86,6 +89,7 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.paper,
+      bottomNavigationBar: const TroclyBottomNav(currentIndex: 0),
       body: Column(
         children: [
           Expanded(
@@ -124,6 +128,18 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               _circleBtn(Icons.arrow_back_ios_new_rounded, () => Get.back()),
+                              GestureDetector(
+                                onTap: () => Get.offAllNamed('/feed'),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.paper.withValues(alpha: 0.92),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(color: AppColors.line),
+                                  ),
+                                  child: AppTypography.wordmark(size: 18),
+                                ),
+                              ),
                               _circleBtn(Icons.ios_share_rounded, () {
                                 Get.snackbar('Partage', 'Lien de l\'annonce copié');
                               }),

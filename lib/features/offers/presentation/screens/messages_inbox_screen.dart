@@ -6,6 +6,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/state_page.dart';
 import '../../../../core/widgets/trocly_bottom_nav.dart';
+import '../../../../core/widgets/trocly_brand_header.dart';
 
 class MessagesInboxScreen extends StatefulWidget {
   const MessagesInboxScreen({Key? key}) : super(key: key);
@@ -58,7 +59,7 @@ class _MessagesInboxScreenState extends State<MessagesInboxScreen>
       backgroundColor: AppColors.paper,
       bottomNavigationBar: const TroclyBottomNav(currentIndex: 3),
       appBar: AppBar(
-        title: Text('Messages', style: AppTypography.serif(size: 24)),
+        title: const TroclyAppBarTitle(pageTitle: 'Messages'),
         automaticallyImplyLeading: false,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(44),

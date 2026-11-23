@@ -5,6 +5,8 @@ import '../../../../controllers/listings_controller.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/primary_button.dart';
+import '../../../../core/widgets/trocly_bottom_nav.dart';
+import '../../../../core/widgets/trocly_brand_header.dart';
 
 class CompleteProfileScreen extends StatefulWidget {
   const CompleteProfileScreen({Key? key}) : super(key: key);
@@ -128,13 +130,11 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.paper,
+      bottomNavigationBar: const TroclyBottomNav(currentIndex: 4),
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        title: Text(
-          'Étape 3 sur 3',
-          style: AppTypography.sans(size: 12.5, color: AppColors.textSecondary),
-        ),
-        centerTitle: true,
+        title: const TroclyAppBarTitle(pageTitle: 'Étape 3/3'),
+        centerTitle: false,
       ),
       body: SafeArea(
         child: Padding(

@@ -9,6 +9,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/primary_button.dart';
 import '../../../../core/widgets/state_page.dart';
 import '../../../../core/widgets/trocly_bottom_nav.dart';
+import '../../../../core/widgets/trocly_brand_header.dart';
 
 /// Écrans 23 & 27 — Profil utilisateur, Mes annonces (uniquement les miennes !),
 /// Historique, Avis reçus, et Dialogue de déconnexion.
@@ -88,8 +89,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       bottomNavigationBar: const TroclyBottomNav(currentIndex: 4),
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        title: Text('Profil',
-            style: AppTypography.sans(size: 16, weight: FontWeight.w600)),
+        title: const TroclyAppBarTitle(pageTitle: 'Profil'),
         actions: [
           Obx(() {
             if (_auth.authToken.value.isEmpty) return const SizedBox.shrink();

@@ -4,6 +4,7 @@ import '../../../../controllers/chat_controller.dart';
 import '../../../../controllers/offers_controller.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/trocly_bottom_nav.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({Key? key}) : super(key: key);
@@ -64,6 +65,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.paper,
+      bottomNavigationBar: const TroclyBottomNav(currentIndex: 3),
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 19),
@@ -72,6 +74,11 @@ class _ChatScreenState extends State<ChatScreen> {
         titleSpacing: 0,
         title: Row(
           children: [
+            GestureDetector(
+              onTap: () => Get.offAllNamed('/feed'),
+              child: AppTypography.wordmark(size: 17),
+            ),
+            const SizedBox(width: 8),
             CircleAvatar(
               radius: 17,
               backgroundColor: AppColors.bubble,

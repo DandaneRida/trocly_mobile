@@ -4,6 +4,8 @@ import '../../../../controllers/notifications_controller.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/state_page.dart';
+import '../../../../core/widgets/trocly_bottom_nav.dart';
+import '../../../../core/widgets/trocly_brand_header.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({Key? key}) : super(key: key);
@@ -51,12 +53,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.paper,
+      bottomNavigationBar: const TroclyBottomNav(currentIndex: 0),
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 19),
           onPressed: () => Get.back(),
         ),
-        title: Text('Notifications', style: AppTypography.serif(size: 22)),
+        title: const TroclyAppBarTitle(pageTitle: 'Notifications'),
         actions: [
           Obx(() {
             if (_controller.unreadCount.value == 0) {

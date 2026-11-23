@@ -5,6 +5,8 @@ import '../../../../controllers/auth_controller.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/primary_button.dart';
+import '../../../../core/widgets/trocly_bottom_nav.dart';
+import '../../../../core/widgets/trocly_brand_header.dart';
 
 class OtpScreen extends StatefulWidget {
   const OtpScreen({Key? key}) : super(key: key);
@@ -67,16 +69,14 @@ class _OtpScreenState extends State<OtpScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.paper,
+      bottomNavigationBar: const TroclyBottomNav(currentIndex: 4),
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 19),
           onPressed: () => Get.back(),
         ),
-        title: Text(
-          'Étape 2 sur 3',
-          style: AppTypography.sans(size: 12.5, color: AppColors.textSecondary),
-        ),
-        centerTitle: true,
+        title: const TroclyAppBarTitle(pageTitle: 'Étape 2/3'),
+        centerTitle: false,
       ),
       body: SafeArea(
         child: Padding(

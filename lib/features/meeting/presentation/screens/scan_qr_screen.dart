@@ -6,6 +6,8 @@ import '../../../../controllers/meeting_controller.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/primary_button.dart';
+import '../../../../core/widgets/trocly_bottom_nav.dart';
+import '../../../../core/widgets/trocly_brand_header.dart';
 
 class ScanQrScreen extends StatefulWidget {
   const ScanQrScreen({Key? key}) : super(key: key);
@@ -104,6 +106,7 @@ class _ScanQrScreenState extends State<ScanQrScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.ink,
+      bottomNavigationBar: const TroclyBottomNav(currentIndex: 3),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         foregroundColor: Colors.white,
@@ -111,11 +114,11 @@ class _ScanQrScreenState extends State<ScanQrScreen> {
           icon: const Icon(Icons.close_rounded, color: Colors.white),
           onPressed: () => Get.back(),
         ),
-        title: Text(
-          'Scanner son QR',
-          style: AppTypography.sans(size: 15.5, weight: FontWeight.w600, color: Colors.white),
+        title: const TroclyAppBarTitle(
+          pageTitle: 'Scanner',
+          darkBackground: true,
         ),
-        centerTitle: true,
+        centerTitle: false,
         actions: [
           if (_cameraController != null)
             IconButton(

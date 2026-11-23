@@ -4,6 +4,8 @@ import '../../../../controllers/meeting_controller.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/primary_button.dart';
+import '../../../../core/widgets/trocly_bottom_nav.dart';
+import '../../../../core/widgets/trocly_brand_header.dart';
 
 class ProposeMeetingScreen extends StatefulWidget {
   const ProposeMeetingScreen({Key? key}) : super(key: key);
@@ -95,12 +97,13 @@ class _ProposeMeetingScreenState extends State<ProposeMeetingScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.paper,
+      bottomNavigationBar: const TroclyBottomNav(currentIndex: 3),
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 19),
           onPressed: () => Get.back(),
         ),
-        title: Text('Proposer un rendez-vous', style: AppTypography.serif(size: 21)),
+        title: const TroclyAppBarTitle(pageTitle: 'Rendez-vous'),
         bottom: const PreferredSize(
           preferredSize: Size.fromHeight(1),
           child: Divider(height: 1),

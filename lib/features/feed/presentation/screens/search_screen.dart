@@ -6,6 +6,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/listing_card.dart';
 import '../../../../core/widgets/state_page.dart';
 import '../../../../core/widgets/trocly_bottom_nav.dart';
+import '../../../../core/widgets/trocly_brand_header.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({Key? key}) : super(key: key);
@@ -91,7 +92,7 @@ class _SearchScreenState extends State<SearchScreen> {
       backgroundColor: AppColors.paper,
       bottomNavigationBar: const TroclyBottomNav(currentIndex: 1),
       appBar: AppBar(
-        title: Text('Explorer', style: AppTypography.serif(size: 22)),
+        title: const TroclyAppBarTitle(pageTitle: 'Explorer'),
         actions: [
           TextButton(
             onPressed: _reset,

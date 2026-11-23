@@ -6,6 +6,8 @@ import '../../../../controllers/reviews_controller.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/primary_button.dart';
+import '../../../../core/widgets/trocly_bottom_nav.dart';
+import '../../../../core/widgets/trocly_brand_header.dart';
 
 class ReviewScreen extends StatefulWidget {
   const ReviewScreen({Key? key}) : super(key: key);
@@ -80,11 +82,13 @@ class _ReviewScreenState extends State<ReviewScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.paper,
+      bottomNavigationBar: const TroclyBottomNav(currentIndex: 3),
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.close_rounded),
           onPressed: () => Get.offAllNamed('/feed'),
         ),
+        title: const TroclyAppBarTitle(pageTitle: 'Avis'),
         actions: [
           TextButton(
             onPressed: () => Get.offAllNamed('/feed'),

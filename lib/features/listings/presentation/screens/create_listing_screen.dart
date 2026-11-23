@@ -7,6 +7,8 @@ import '../../../../controllers/listings_controller.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/primary_button.dart';
+import '../../../../core/widgets/trocly_bottom_nav.dart';
+import '../../../../core/widgets/trocly_brand_header.dart';
 
 class CreateListingScreen extends StatefulWidget {
   const CreateListingScreen({Key? key}) : super(key: key);
@@ -231,16 +233,14 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.paper,
+      bottomNavigationBar: const TroclyBottomNav(currentIndex: 2),
       appBar: AppBar(
         leading: IconButton(
           icon: Icon(_step == 1 ? Icons.close_rounded : Icons.arrow_back_ios_new_rounded, size: 20),
           onPressed: _prevStep,
         ),
-        title: Text(
-          'Étape $_step sur $_totalSteps',
-          style: AppTypography.sans(size: 12.5, color: AppColors.textSecondary),
-        ),
-        centerTitle: true,
+        title: TroclyAppBarTitle(pageTitle: 'Étape $_step/$_totalSteps'),
+        centerTitle: false,
       ),
       body: Column(
         children: [

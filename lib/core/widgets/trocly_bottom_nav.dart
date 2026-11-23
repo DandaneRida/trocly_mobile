@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
+import '../../controllers/auth_controller.dart';
 import '../../controllers/chat_controller.dart';
 
 /// Barre de navigation basse Trocly (5 onglets épurés à filet supérieur)
@@ -15,6 +16,10 @@ class TroclyBottomNav extends StatelessWidget {
 
   void _onTap(int index) {
     if (index == currentIndex) return;
+    final auth =
+        Get.isRegistered<AuthController>() ? Get.find<AuthController>() : null;
+    final isLoggedIn = auth != null && auth.authToken.value.isNotEmpty;
+
     switch (index) {
       case 0:
         Get.offAllNamed('/feed');
@@ -23,7 +28,11 @@ class TroclyBottomNav extends StatelessWidget {
         Get.toNamed('/search');
         break;
       case 2:
-        Get.toNamed('/publish');
+        if (!isLoggedIn) {
+          Get.toNamed('/login');
+        } else {
+          Get.toNamed('/publish');
+        }
         break;
       case 3:
         Get.toNamed('/messages');

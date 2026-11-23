@@ -4,6 +4,8 @@ import '../../../../controllers/listings_controller.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/state_page.dart';
+import '../../../../core/widgets/trocly_bottom_nav.dart';
+import '../../../../core/widgets/trocly_brand_header.dart';
 
 class MyListingsScreen extends StatefulWidget {
   const MyListingsScreen({Key? key}) : super(key: key);
@@ -62,8 +64,9 @@ class _MyListingsScreenState extends State<MyListingsScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.paper,
+      bottomNavigationBar: const TroclyBottomNav(currentIndex: 2),
       appBar: AppBar(
-        title: Text('Mes annonces', style: AppTypography.serif(size: 22)),
+        title: const TroclyAppBarTitle(pageTitle: 'Mes annonces'),
         actions: [
           TextButton.icon(
             onPressed: () async {

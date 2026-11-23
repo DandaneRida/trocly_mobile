@@ -7,6 +7,8 @@ import '../../../../core/constants/api_constants.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/primary_button.dart';
+import '../../../../core/widgets/trocly_bottom_nav.dart';
+import '../../../../core/widgets/trocly_brand_header.dart';
 
 class ReportScreen extends StatefulWidget {
   const ReportScreen({Key? key}) : super(key: key);
@@ -77,12 +79,13 @@ class _ReportScreenState extends State<ReportScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.paper,
+      bottomNavigationBar: const TroclyBottomNav(currentIndex: 4),
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.close_rounded),
           onPressed: () => Get.back(),
         ),
-        title: Text('Signaler', style: AppTypography.sans(size: 16, weight: FontWeight.w600)),
+        title: const TroclyAppBarTitle(pageTitle: 'Signaler'),
         bottom: const PreferredSize(
           preferredSize: Size.fromHeight(1),
           child: Divider(height: 1),

@@ -48,13 +48,13 @@ class AppTypography {
   }
 
   /// Wordmark « trocly. »
-  static Widget wordmark({double size = 24}) {
+  static Widget wordmark({double size = 24, Color color = AppColors.ink}) {
     return RichText(
       text: TextSpan(
         style: GoogleFonts.inter(
           fontSize: size,
           fontWeight: FontWeight.w800,
-          color: AppColors.ink,
+          color: color,
           letterSpacing: -1.0,
         ),
         children: const [
