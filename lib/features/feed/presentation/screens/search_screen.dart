@@ -25,10 +25,10 @@ class _SearchScreenState extends State<SearchScreen> {
 
   final List<String> _categories = const [
     'Tous',
+    'Vêtements',
     'Électronique',
     'Maison',
     'Véhicules',
-    'Vêtements',
     'Sport',
     'Livres',
     'Bricolage',

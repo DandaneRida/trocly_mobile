@@ -24,10 +24,10 @@ class _FeedScreenState extends State<FeedScreen> {
   int _selectedCategoryIndex = 0;
   final List<String> _categories = const [
     'Tout',
+    'Vêtements',
     'Électronique',
     'Maison',
     'Véhicules',
-    'Vêtements',
     'Livres',
     'Sport',
     'Bricolage',

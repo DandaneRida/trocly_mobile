@@ -38,15 +38,15 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
   final _wishController = TextEditingController();
   final _brandController = TextEditingController();
 
-  String _selectedCategory = 'Électronique';
+  String _selectedCategory = 'Vêtements';
   String _selectedCondition = 'tres_bon';
   String _selectedCity = 'Meknès';
 
   final List<String> _categories = const [
+    'Vêtements',
     'Électronique',
     'Maison',
     'Véhicules',
-    'Vêtements',
     'Sport',
     'Livres',
     'Bricolage',
