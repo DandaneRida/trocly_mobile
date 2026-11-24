@@ -146,9 +146,9 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                 borderRadius: BorderRadius.circular(2),
                 child: const LinearProgressIndicator(
                   value: 1.0,
-                  minHeight: 3,
+                  minHeight: 4,
                   backgroundColor: AppColors.line,
-                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.ink),
+                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.accent),
                 ),
               ),
               const SizedBox(height: 32),

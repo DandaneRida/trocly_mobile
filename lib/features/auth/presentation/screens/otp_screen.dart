@@ -88,9 +88,9 @@ class _OtpScreenState extends State<OtpScreen> {
                 borderRadius: BorderRadius.circular(2),
                 child: const LinearProgressIndicator(
                   value: 2 / 3,
-                  minHeight: 3,
+                  minHeight: 4,
                   backgroundColor: AppColors.line,
-                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.ink),
+                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.accent),
                 ),
               ),
               const SizedBox(height: 32),

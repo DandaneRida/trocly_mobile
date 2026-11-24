@@ -20,7 +20,7 @@ class PrimaryButton extends StatelessWidget {
     this.isOutlined = false,
     this.backgroundColor,
     this.textColor,
-    this.height = 46,
+    this.height = 50,
     this.icon,
   }) : super(key: key);
 
@@ -28,18 +28,24 @@ class PrimaryButton extends StatelessWidget {
   Widget build(BuildContext context) {
     if (isOutlined) {
       final fg = textColor ?? AppColors.ink;
-      return SizedBox(
+      return Container(
         height: height,
         width: double.infinity,
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: AppColors.pillShadow,
+        ),
         child: OutlinedButton(
           onPressed: isLoading ? null : onPressed,
           style: OutlinedButton.styleFrom(
+            backgroundColor: AppColors.surface,
             side: BorderSide(
-              color: backgroundColor ?? AppColors.ink,
-              width: 1,
+              color: backgroundColor ?? AppColors.borderLight,
+              width: 1.2,
             ),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(28),
             ),
           ),
           child: isLoading
@@ -76,11 +82,21 @@ class PrimaryButton extends StatelessWidget {
       );
     }
 
-    final bg = backgroundColor ?? AppColors.ink;
+    final bg = backgroundColor ?? AppColors.accent;
     final fg = textColor ?? Colors.white;
-    return SizedBox(
+    final enabled = !isLoading && onPressed != null;
+
+    return Container(
       height: height,
       width: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: enabled && bg == AppColors.accent
+            ? AppColors.coralShadow
+            : enabled
+                ? AppColors.pillShadow
+                : null,
+      ),
       child: ElevatedButton(
         onPressed: isLoading ? null : onPressed,
         style: ElevatedButton.styleFrom(
@@ -89,7 +105,7 @@ class PrimaryButton extends StatelessWidget {
           disabledBackgroundColor: bg.withValues(alpha: 0.45),
           elevation: 0,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(28),
           ),
         ),
         child: isLoading
@@ -105,7 +121,7 @@ class PrimaryButton extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   if (icon != null) ...[
-                    Icon(icon, size: 17, color: fg),
+                    Icon(icon, size: 18, color: fg),
                     const SizedBox(width: 8),
                   ],
                   Flexible(
@@ -114,8 +130,8 @@ class PrimaryButton extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: AppTypography.sans(
-                        size: 14,
-                        weight: FontWeight.w600,
+                        size: 14.5,
+                        weight: FontWeight.w700,
                         color: fg,
                       ),
                     ),

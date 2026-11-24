@@ -3,8 +3,7 @@ import 'package:get/get.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 
-/// En-tête de marque uniforme : affiche le logo « trocly. » cliquable (retour Accueil)
-/// suivi optionnellement du titre de la page courante.
+/// En-tête de marque moderne : logo « trocly. » cliquable + titre de page
 class TroclyAppBarTitle extends StatelessWidget {
   final String? pageTitle;
   final bool darkBackground;
@@ -31,18 +30,16 @@ class TroclyAppBarTitle extends StatelessWidget {
               Get.offAllNamed('/feed');
             }
           },
-          child: AppTypography.wordmark(size: 20, color: fg),
+          child: AppTypography.wordmark(size: 21, color: fg),
         ),
         if (pageTitle != null && pageTitle!.isNotEmpty) ...[
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Text(
-              '·',
-              style: AppTypography.sans(
-                size: 16,
-                weight: FontWeight.w600,
-                color: sub,
-              ),
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 9),
+            width: 4,
+            height: 4,
+            decoration: BoxDecoration(
+              color: sub.withValues(alpha: 0.55),
+              shape: BoxShape.circle,
             ),
           ),
           Flexible(
@@ -51,8 +48,8 @@ class TroclyAppBarTitle extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: AppTypography.sans(
-                size: 14.5,
-                weight: FontWeight.w600,
+                size: 15,
+                weight: FontWeight.w700,
                 color: fg,
               ),
             ),
@@ -60,5 +57,64 @@ class TroclyAppBarTitle extends StatelessWidget {
         ],
       ],
     );
+  }
+}
+
+/// Bouton icône circulaire blanc pur avec ombre douce (signature design moderne)
+class TroclyCircleIconBtn extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  final Color? iconColor;
+  final int badgeCount;
+  final String? tooltip;
+
+  const TroclyCircleIconBtn({
+    Key? key,
+    required this.icon,
+    required this.onTap,
+    this.iconColor,
+    this.badgeCount = 0,
+    this.tooltip,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final btn = GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: const BoxDecoration(
+          color: AppColors.surface,
+          shape: BoxShape.circle,
+          boxShadow: AppColors.pillShadow,
+        ),
+        child: Stack(
+          alignment: Alignment.center,
+          clipBehavior: Clip.none,
+          children: [
+            Icon(icon, size: 20, color: iconColor ?? AppColors.ink),
+            if (badgeCount > 0)
+              Positioned(
+                top: 6,
+                right: 6,
+                child: Container(
+                  width: 9,
+                  height: 9,
+                  decoration: BoxDecoration(
+                    color: AppColors.accent,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppColors.surface, width: 1.5),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (tooltip != null) {
+      return Tooltip(message: tooltip!, child: btn);
+    }
+    return btn;
   }
 }

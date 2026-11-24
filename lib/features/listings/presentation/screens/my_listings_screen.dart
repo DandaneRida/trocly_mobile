@@ -94,12 +94,12 @@ class _MyListingsScreenState extends State<MyListingsScreen>
             ),
             child: TabBar(
               controller: _tabController,
-              indicatorColor: AppColors.ink,
-              indicatorWeight: 2,
-              labelColor: AppColors.ink,
+              indicatorColor: AppColors.accent,
+              indicatorWeight: 2.5,
+              labelColor: AppColors.accent,
               unselectedLabelColor: AppColors.textSecondary,
-              labelStyle: AppTypography.sans(size: 13.5, weight: FontWeight.w600),
-              unselectedLabelStyle: AppTypography.sans(size: 13.5),
+              labelStyle: AppTypography.sans(size: 13.5, weight: FontWeight.w700),
+              unselectedLabelStyle: AppTypography.sans(size: 13.5, weight: FontWeight.w500),
               dividerColor: Colors.transparent,
               tabs: const [
                 Tab(text: 'Actives'),

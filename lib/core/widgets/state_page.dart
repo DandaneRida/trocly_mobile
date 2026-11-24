@@ -90,25 +90,35 @@ class StatePage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 36),
+        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                color: AppColors.bubble,
+              width: 74,
+              height: 74,
+              decoration: const BoxDecoration(
+                color: AppColors.surface,
                 shape: BoxShape.circle,
-                border: Border.all(color: AppColors.line),
+                boxShadow: AppColors.cardShadow,
               ),
-              child: Icon(_icon(), size: 28, color: AppColors.ink),
+              child: Center(
+                child: Container(
+                  width: 52,
+                  height: 52,
+                  decoration: const BoxDecoration(
+                    color: AppColors.accentLight,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(_icon(), size: 25, color: AppColors.accent),
+                ),
+              ),
             ),
             const SizedBox(height: 18),
             Text(
               _title(),
               textAlign: TextAlign.center,
-              style: AppTypography.serif(size: 21),
+              style: AppTypography.serif(size: 19),
             ),
             const SizedBox(height: 8),
             Text(
@@ -117,13 +127,13 @@ class StatePage extends StatelessWidget {
               style: AppTypography.sans(
                 size: 13,
                 color: AppColors.textSecondary,
-                height: 1.45,
+                height: 1.5,
               ),
             ),
             if (actionLabel != null && onAction != null) ...[
               const SizedBox(height: 22),
               ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 260),
+                constraints: const BoxConstraints(maxWidth: 240),
                 child: PrimaryButton(
                   label: actionLabel!,
                   onPressed: onAction,

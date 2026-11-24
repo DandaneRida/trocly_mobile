@@ -3,15 +3,16 @@ import 'package:google_fonts/google_fonts.dart';
 import 'app_colors.dart';
 
 class AppTypography {
-  /// Titres éditoriaux en serif (Newsreader)
+  /// Titres modernes géométriques (Plus Jakarta Sans Bold)
+  /// (Conserve le nom `serif` pour compatibilité sur l'ensemble des écrans)
   static TextStyle serif({
     double size = 22,
-    FontWeight weight = FontWeight.w500,
+    FontWeight weight = FontWeight.w700,
     Color color = AppColors.ink,
     double height = 1.2,
-    double letterSpacing = -0.3,
+    double letterSpacing = -0.45,
   }) {
-    return GoogleFonts.newsreader(
+    return GoogleFonts.plusJakartaSans(
       fontSize: size,
       fontWeight: weight,
       color: color,
@@ -20,7 +21,7 @@ class AppTypography {
     );
   }
 
-  /// Corps d'interface en sans-serif net (Inter)
+  /// Corps d'interface moderne et lisible (Plus Jakarta Sans)
   static TextStyle sans({
     double size = 13.5,
     FontWeight weight = FontWeight.w400,
@@ -28,7 +29,7 @@ class AppTypography {
     double? height,
     double? letterSpacing,
   }) {
-    return GoogleFonts.inter(
+    return GoogleFonts.plusJakartaSans(
       fontSize: size,
       fontWeight: weight,
       color: color,
@@ -37,25 +38,25 @@ class AppTypography {
     );
   }
 
-  /// Label majuscule discret (eyebrow)
+  /// Label majuscule moderne (eyebrow)
   static TextStyle eyebrow({Color color = AppColors.textHint}) {
-    return GoogleFonts.inter(
-      fontSize: 11,
-      fontWeight: FontWeight.w600,
+    return GoogleFonts.plusJakartaSans(
+      fontSize: 10.5,
+      fontWeight: FontWeight.w700,
       color: color,
-      letterSpacing: 0.7,
+      letterSpacing: 0.9,
     );
   }
 
-  /// Wordmark « trocly. »
+  /// Wordmark « trocly. » moderne
   static Widget wordmark({double size = 24, Color color = AppColors.ink}) {
     return RichText(
       text: TextSpan(
-        style: GoogleFonts.inter(
+        style: GoogleFonts.plusJakartaSans(
           fontSize: size,
           fontWeight: FontWeight.w800,
           color: color,
-          letterSpacing: -1.0,
+          letterSpacing: -0.9,
         ),
         children: const [
           TextSpan(text: 'trocly'),
@@ -71,13 +72,13 @@ class AppTypography {
 
 class AppTheme {
   static ThemeData get light {
-    final baseText = GoogleFonts.interTextTheme();
+    final baseText = GoogleFonts.plusJakartaSansTextTheme();
     return ThemeData(
       useMaterial3: true,
       colorScheme: const ColorScheme.light(
-        primary: AppColors.ink,
+        primary: AppColors.accent,
         onPrimary: Colors.white,
-        secondary: AppColors.accent,
+        secondary: AppColors.ink,
         onSecondary: Colors.white,
         surface: AppColors.surface,
         onSurface: AppColors.ink,
@@ -96,10 +97,10 @@ class AppTheme {
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
-        titleTextStyle: GoogleFonts.inter(
+        titleTextStyle: GoogleFonts.plusJakartaSans(
           color: AppColors.ink,
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
+          fontSize: 17,
+          fontWeight: FontWeight.w700,
         ),
         iconTheme: const IconThemeData(color: AppColors.ink, size: 22),
       ),
@@ -111,50 +112,51 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.surface,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-        hintStyle: GoogleFonts.inter(color: AppColors.textHint, fontSize: 13.5),
-        labelStyle: GoogleFonts.inter(color: AppColors.textSecondary, fontSize: 13),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        hintStyle: GoogleFonts.plusJakartaSans(color: AppColors.textHint, fontSize: 13.5),
+        labelStyle: GoogleFonts.plusJakartaSans(color: AppColors.textSecondary, fontSize: 13),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(18),
           borderSide: const BorderSide(color: AppColors.line),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(18),
           borderSide: const BorderSide(color: AppColors.line),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: AppColors.ink, width: 1.4),
+          borderRadius: BorderRadius.circular(18),
+          borderSide: const BorderSide(color: AppColors.accent, width: 1.6),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(18),
           borderSide: const BorderSide(color: AppColors.error),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.ink,
+          backgroundColor: AppColors.accent,
           foregroundColor: Colors.white,
           elevation: 0,
-          minimumSize: const Size.fromHeight(46),
+          minimumSize: const Size.fromHeight(48),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(28),
           ),
-          textStyle: GoogleFonts.inter(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
+          textStyle: GoogleFonts.plusJakartaSans(
+            fontSize: 14.5,
+            fontWeight: FontWeight.w700,
           ),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
+          backgroundColor: AppColors.surface,
           foregroundColor: AppColors.ink,
-          side: const BorderSide(color: AppColors.ink, width: 1),
-          minimumSize: const Size.fromHeight(46),
+          side: const BorderSide(color: AppColors.borderLight, width: 1.2),
+          minimumSize: const Size.fromHeight(48),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(28),
           ),
-          textStyle: GoogleFonts.inter(
+          textStyle: GoogleFonts.plusJakartaSans(
             fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
@@ -164,14 +166,14 @@ class AppTheme {
         backgroundColor: AppColors.paper,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
         ),
       ),
       snackBarTheme: SnackBarThemeData(
         backgroundColor: AppColors.ink,
-        contentTextStyle: GoogleFonts.inter(color: Colors.white, fontSize: 13),
+        contentTextStyle: GoogleFonts.plusJakartaSans(color: Colors.white, fontSize: 13),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
     );
   }

@@ -114,11 +114,23 @@ class _SearchScreenState extends State<SearchScreen> {
                   textInputAction: TextInputAction.search,
                   onSubmitted: (_) => _applyFilters(),
                   decoration: InputDecoration(
-                    hintText: 'Rechercher un vélo, un livre, une console…',
-                    prefixIcon: const Icon(Icons.search_rounded, size: 20, color: AppColors.textHint),
+                    hintText: 'Rechercher un vêtement, un vélo, une console…',
+                    prefixIcon: const Icon(Icons.search_rounded, size: 20, color: AppColors.textSecondary),
                     suffixIcon: IconButton(
-                      icon: const Icon(Icons.arrow_forward_rounded, size: 19, color: AppColors.ink),
+                      icon: const Icon(Icons.arrow_forward_rounded, size: 19, color: AppColors.accent),
                       onPressed: _applyFilters,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(26),
+                      borderSide: const BorderSide(color: AppColors.line),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(26),
+                      borderSide: const BorderSide(color: AppColors.line),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(26),
+                      borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
                     ),
                   ),
                 ),
@@ -181,12 +193,11 @@ class _SearchScreenState extends State<SearchScreen> {
               ],
             ),
           ),
-          const Divider(),
           Expanded(
             child: Obx(() {
               if (_listingsController.isLoading.value) {
                 return const Center(
-                  child: CircularProgressIndicator(color: AppColors.ink, strokeWidth: 2),
+                  child: CircularProgressIndicator(color: AppColors.accent, strokeWidth: 2.5),
                 );
               }
               if (_listingsController.listings.isEmpty) {
@@ -197,10 +208,10 @@ class _SearchScreenState extends State<SearchScreen> {
                 );
               }
               return GridView.builder(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
-                  childAspectRatio: 0.67,
+                  childAspectRatio: 0.68,
                   crossAxisSpacing: 14,
                   mainAxisSpacing: 20,
                 ),
@@ -233,11 +244,11 @@ class _SearchScreenState extends State<SearchScreen> {
   }) {
     final active = value != null && value != 'Tous' && value != 'Toutes';
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
-        color: active ? AppColors.ink : AppColors.surface,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: active ? AppColors.ink : AppColors.line),
+        color: active ? AppColors.accent : AppColors.surface,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: active ? AppColors.coralShadow : AppColors.pillShadow,
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<T>(

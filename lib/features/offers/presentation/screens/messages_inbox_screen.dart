@@ -69,12 +69,12 @@ class _MessagesInboxScreenState extends State<MessagesInboxScreen>
             ),
             child: TabBar(
               controller: _tabController,
-              indicatorColor: AppColors.ink,
-              indicatorWeight: 2,
-              labelColor: AppColors.ink,
+              indicatorColor: AppColors.accent,
+              indicatorWeight: 2.5,
+              labelColor: AppColors.accent,
               unselectedLabelColor: AppColors.textSecondary,
-              labelStyle: AppTypography.sans(size: 13.5, weight: FontWeight.w600),
-              unselectedLabelStyle: AppTypography.sans(size: 13.5),
+              labelStyle: AppTypography.sans(size: 13.5, weight: FontWeight.w700),
+              unselectedLabelStyle: AppTypography.sans(size: 13.5, weight: FontWeight.w500),
               dividerColor: Colors.transparent,
               tabs: const [
                 Tab(text: 'Tous'),
@@ -133,11 +133,11 @@ class _MessagesInboxScreenState extends State<MessagesInboxScreen>
 
     return RefreshIndicator(
       onRefresh: () => _chatController.fetchConversations(),
-      color: AppColors.ink,
+      color: AppColors.accent,
       child: ListView.separated(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
         itemCount: list.length,
-        separatorBuilder: (_, __) => const Divider(),
+        separatorBuilder: (_, __) => const SizedBox(height: 10),
         itemBuilder: (_, idx) {
           final conv = list[idx];
           final initials = conv.otherUserName
@@ -149,13 +149,18 @@ class _MessagesInboxScreenState extends State<MessagesInboxScreen>
           final isAccepted = conv.offerStatus == 'accepted';
           final isPending = conv.offerStatus == 'pending' || conv.offerStatus == 'countered';
 
-          return InkWell(
+          return GestureDetector(
             onTap: () async {
               await Get.toNamed('/chat/${conv.offerId}', arguments: conv);
               _chatController.fetchConversations();
             },
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 13),
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: AppColors.cardShadow,
+              ),
               child: Row(
                 children: [
                   Stack(

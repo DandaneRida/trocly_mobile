@@ -18,10 +18,10 @@ class SplashScreen extends StatelessWidget {
         child: LayoutBuilder(
           builder: (context, constraints) {
             return SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+              padding: const EdgeInsets.fromLTRB(22, 20, 22, 24),
               child: ConstrainedBox(
                 constraints: BoxConstraints(
-                  minHeight: constraints.maxHeight - 48,
+                  minHeight: constraints.maxHeight - 44,
                 ),
                 child: IntrinsicHeight(
                   child: Center(
@@ -30,71 +30,130 @@ class SplashScreen extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          AppTypography.wordmark(size: 28),
-                          const SizedBox(height: 4),
-                          Text(
-                            'TROC LOCAL AU MAROC',
-                            style: AppTypography.eyebrow(color: AppColors.accent),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              AppTypography.wordmark(size: 30),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: AppColors.accentLight,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  'TROC AU MAROC',
+                                  style: AppTypography.eyebrow(
+                                      color: AppColors.accent),
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 18),
 
-                          // Editorial exchange hero photo bundled in assets/images/
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(14),
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: AppColors.imagePlaceholder,
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: AppColors.line),
-                              ),
-                              child: AspectRatio(
-                                aspectRatio: 16 / 9,
-                                child: Image.asset(
-                                  'assets/images/welcome_exchange.jpg',
-                                  fit: BoxFit.cover,
+                          // Carte héro arrondie 24px avec badge flottant
+                          Stack(
+                            children: [
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: AppColors.imagePlaceholder,
+                                  borderRadius: BorderRadius.circular(24),
+                                  boxShadow: AppColors.cardShadow,
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(24),
+                                  child: AspectRatio(
+                                    aspectRatio: 16 / 10,
+                                    child: Image.asset(
+                                      'assets/images/welcome_exchange.jpg',
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
                                 ),
                               ),
-                            ),
+                              Positioned(
+                                bottom: 12,
+                                left: 12,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.surface
+                                        .withValues(alpha: 0.94),
+                                    borderRadius: BorderRadius.circular(20),
+                                    boxShadow: AppColors.pillShadow,
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Container(
+                                        width: 20,
+                                        height: 20,
+                                        decoration: const BoxDecoration(
+                                          color: AppColors.accent,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(
+                                          Icons.swap_horiz_rounded,
+                                          size: 13,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 7),
+                                      Text(
+                                        '100 % troc · Zéro frais',
+                                        style: AppTypography.sans(
+                                          size: 12,
+                                          weight: FontWeight.w700,
+                                          color: AppColors.ink,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 22),
 
                           Text(
-                            'Donnez une seconde vie à ce que vous n\'utilisez plus.',
-                            style: AppTypography.serif(size: 30, height: 1.15),
+                            'Échangez ce que vous n\'utilisez plus.',
+                            style: AppTypography.serif(size: 28, height: 1.15),
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 8),
                           Text(
-                            'Proposez un ou plusieurs objets, négociez une soulte si besoin, et validez la rencontre par double scan QR.',
+                            'Proposez un ou plusieurs objets près de chez vous, discutez en direct et validez la rencontre par double scan QR.',
                             style: AppTypography.sans(
                               size: 13.5,
                               color: AppColors.textSecondary,
                               height: 1.5,
                             ),
                           ),
-                          const SizedBox(height: 22),
-                          const Divider(),
-                          const _FeatureRow(
-                            icon: Icons.location_on_outlined,
+                          const SizedBox(height: 20),
+
+                          const _FeatureCard(
+                            icon: Icons.location_on_rounded,
                             title: 'Annonces par ville',
                             subtitle: 'Explorez librement, sans créer de compte',
                           ),
-                          const Divider(),
-                          const _FeatureRow(
+                          const SizedBox(height: 10),
+                          const _FeatureCard(
                             icon: Icons.swap_horiz_rounded,
                             title: 'Échange multi-objets',
-                            subtitle: 'Combinez plusieurs biens et ajustez en dirhams',
+                            subtitle: 'Combinez plusieurs biens, soulte optionnelle',
                           ),
-                          const Divider(),
-                          const _FeatureRow(
+                          const SizedBox(height: 10),
+                          const _FeatureCard(
                             icon: Icons.qr_code_scanner_rounded,
                             title: 'Rencontre sécurisée',
                             subtitle: 'Double scan QR sur place et avis mutuels',
                           ),
-                          const Divider(),
+
                           const Spacer(),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 22),
                           PrimaryButton(
                             label: 'Explorer les annonces',
+                            icon: Icons.arrow_forward_rounded,
                             onPressed: () => Get.offNamed('/feed'),
                           ),
                           const SizedBox(height: 8),
@@ -108,9 +167,9 @@ class SplashScreen extends StatelessWidget {
                                 child: Text(
                                   'Déjà membre ? Se connecter',
                                   style: AppTypography.sans(
-                                    size: 13,
-                                    weight: FontWeight.w500,
-                                    color: AppColors.textSecondary,
+                                    size: 13.5,
+                                    weight: FontWeight.w600,
+                                    color: AppColors.accent,
                                   ),
                                 ),
                               ),
@@ -130,12 +189,12 @@ class SplashScreen extends StatelessWidget {
   }
 }
 
-class _FeatureRow extends StatelessWidget {
+class _FeatureCard extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
 
-  const _FeatureRow({
+  const _FeatureCard({
     required this.icon,
     required this.title,
     required this.subtitle,
@@ -143,19 +202,32 @@ class _FeatureRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 11),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: AppColors.cardShadow,
+      ),
       child: Row(
         children: [
-          Icon(icon, size: 19, color: AppColors.ink),
-          const SizedBox(width: 14),
+          Container(
+            width: 40,
+            height: 40,
+            decoration: const BoxDecoration(
+              color: AppColors.accentLight,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 19, color: AppColors.accent),
+          ),
+          const SizedBox(width: 13),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
-                  style: AppTypography.sans(size: 13.5, weight: FontWeight.w600),
+                  style: AppTypography.sans(size: 13.5, weight: FontWeight.w700),
                 ),
                 const SizedBox(height: 2),
                 Text(

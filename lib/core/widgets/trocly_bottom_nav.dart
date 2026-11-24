@@ -5,7 +5,7 @@ import '../theme/app_theme.dart';
 import '../../controllers/auth_controller.dart';
 import '../../controllers/chat_controller.dart';
 
-/// Barre de navigation basse Trocly (5 onglets épurés à filet supérieur)
+/// Barre de navigation moderne avec pilule corail extensible sur l'onglet actif
 class TroclyBottomNav extends StatelessWidget {
   final int currentIndex;
 
@@ -52,38 +52,39 @@ class TroclyBottomNav extends StatelessWidget {
     return Container(
       decoration: const BoxDecoration(
         color: AppColors.surface,
-        border: Border(top: BorderSide(color: AppColors.line, width: 1)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        boxShadow: AppColors.navShadow,
       ),
       child: SafeArea(
         top: false,
-        child: SizedBox(
-          height: 62,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _NavItem(
+              _PillNavItem(
                 icon: Icons.home_outlined,
                 activeIcon: Icons.home_rounded,
                 label: 'Accueil',
                 isActive: currentIndex == 0,
                 onTap: () => _onTap(0),
               ),
-              _NavItem(
+              _PillNavItem(
                 icon: Icons.search_rounded,
                 activeIcon: Icons.search_rounded,
                 label: 'Explorer',
                 isActive: currentIndex == 1,
                 onTap: () => _onTap(1),
               ),
-              _NavItem(
-                icon: Icons.add_box_outlined,
-                activeIcon: Icons.add_box_rounded,
+              _PillNavItem(
+                icon: Icons.add_circle_outline_rounded,
+                activeIcon: Icons.add_circle_rounded,
                 label: 'Publier',
                 isActive: currentIndex == 2,
                 onTap: () => _onTap(2),
               ),
               chatCtrl != null
-                  ? Obx(() => _NavItem(
+                  ? Obx(() => _PillNavItem(
                         icon: Icons.chat_bubble_outline_rounded,
                         activeIcon: Icons.chat_bubble_rounded,
                         label: 'Messages',
@@ -91,14 +92,14 @@ class TroclyBottomNav extends StatelessWidget {
                         badgeCount: chatCtrl.unreadCount.value,
                         onTap: () => _onTap(3),
                       ))
-                  : _NavItem(
+                  : _PillNavItem(
                       icon: Icons.chat_bubble_outline_rounded,
                       activeIcon: Icons.chat_bubble_rounded,
                       label: 'Messages',
                       isActive: currentIndex == 3,
                       onTap: () => _onTap(3),
                     ),
-              _NavItem(
+              _PillNavItem(
                 icon: Icons.person_outline_rounded,
                 activeIcon: Icons.person_rounded,
                 label: 'Profil',
@@ -113,7 +114,7 @@ class TroclyBottomNav extends StatelessWidget {
   }
 }
 
-class _NavItem extends StatelessWidget {
+class _PillNavItem extends StatelessWidget {
   final IconData icon;
   final IconData activeIcon;
   final String label;
@@ -121,7 +122,7 @@ class _NavItem extends StatelessWidget {
   final int badgeCount;
   final VoidCallback onTap;
 
-  const _NavItem({
+  const _PillNavItem({
     required this.icon,
     required this.activeIcon,
     required this.label,
@@ -132,25 +133,39 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = isActive ? AppColors.ink : AppColors.textHint;
-    return InkWell(
+    return GestureDetector(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: SizedBox(
-        width: 64,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        padding: EdgeInsets.symmetric(
+          horizontal: isActive ? 14 : 10,
+          vertical: 9,
+        ),
+        decoration: BoxDecoration(
+          color: isActive ? AppColors.accent : Colors.transparent,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: isActive ? AppColors.coralShadow : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Stack(
               clipBehavior: Clip.none,
               children: [
-                Icon(isActive ? activeIcon : icon, size: 22, color: color),
-                if (badgeCount > 0)
+                Icon(
+                  isActive ? activeIcon : icon,
+                  size: 21,
+                  color: isActive ? Colors.white : AppColors.textSecondary,
+                ),
+                if (badgeCount > 0 && !isActive)
                   Positioned(
                     top: -4,
-                    right: -8,
+                    right: -7,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 4.5, vertical: 1),
                       decoration: BoxDecoration(
                         color: AppColors.accent,
                         borderRadius: BorderRadius.circular(10),
@@ -167,15 +182,17 @@ class _NavItem extends StatelessWidget {
                   ),
               ],
             ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: AppTypography.sans(
-                size: 10.5,
-                weight: isActive ? FontWeight.w600 : FontWeight.w400,
-                color: color,
+            if (isActive) ...[
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: AppTypography.sans(
+                  size: 12.5,
+                  weight: FontWeight.w700,
+                  color: Colors.white,
+                ),
               ),
-            ),
+            ],
           ],
         ),
       ),

@@ -250,9 +250,9 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
               borderRadius: BorderRadius.circular(2),
               child: LinearProgressIndicator(
                 value: _step / _totalSteps,
-                minHeight: 3,
+                minHeight: 4,
                 backgroundColor: AppColors.line,
-                valueColor: const AlwaysStoppedAnimation<Color>(AppColors.ink),
+                valueColor: const AlwaysStoppedAnimation<Color>(AppColors.accent),
               ),
             ),
           ),

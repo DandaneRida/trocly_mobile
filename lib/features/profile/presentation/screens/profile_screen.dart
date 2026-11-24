@@ -11,8 +11,8 @@ import '../../../../core/widgets/state_page.dart';
 import '../../../../core/widgets/trocly_bottom_nav.dart';
 import '../../../../core/widgets/trocly_brand_header.dart';
 
-/// Écrans 23 & 27 — Profil utilisateur, Mes annonces (uniquement les miennes !),
-/// Historique, Avis reçus, et Dialogue de déconnexion.
+/// Écran Profil moderne : avatar centré avec pastille corail, carte stats blanche,
+/// onglets pilules corail et cartes blanches arrondies pour Mes annonces / Historique / Avis.
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
 
@@ -20,51 +20,49 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen>
-    with SingleTickerProviderStateMixin {
+class _ProfileScreenState extends State<ProfileScreen> {
   final AuthController _auth = Get.find<AuthController>();
   final ListingsController _listings = Get.find<ListingsController>();
   final ReviewsController _reviews = Get.find<ReviewsController>();
   final MeetingController _meetings = Get.find<MeetingController>();
-  late TabController _tabController;
+
+  int _selectedTab = 0;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_auth.authToken.value.isNotEmpty) {
-        _listings.fetchMyListings();
-        _meetings.fetchMyMeetings();
-        if (_auth.userId.value.isNotEmpty) {
-          _reviews.fetchUserStats(_auth.userId.value);
-        }
-      }
+      _refreshProfileData();
     });
   }
 
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
+  Future<void> _refreshProfileData() async {
+    if (_auth.authToken.value.isEmpty) return;
+    await Future.wait([
+      _listings.fetchMyListings(),
+      _meetings.fetchMyMeetings(),
+      if (_auth.userId.value.isNotEmpty)
+        _reviews.fetchUserStats(_auth.userId.value),
+    ]);
   }
 
   void _confirmLogout() {
     Get.dialog(
       AlertDialog(
         backgroundColor: AppColors.paper,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        title: Text('Se déconnecter ?', style: AppTypography.serif(size: 22)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: Text('Se déconnecter ?', style: AppTypography.serif(size: 20)),
         content: Text(
           'Vous reviendrez en mode invité. Vous pourrez vous reconnecter à tout moment avec votre numéro WhatsApp.',
           style: AppTypography.sans(
-              size: 13, color: AppColors.textSecondary, height: 1.45),
+              size: 13, color: AppColors.textSecondary, height: 1.5),
         ),
         actions: [
           TextButton(
             onPressed: () => Get.back(),
             child: Text('Annuler',
-                style: AppTypography.sans(color: AppColors.textSecondary)),
+                style: AppTypography.sans(
+                    color: AppColors.textSecondary, weight: FontWeight.w600)),
           ),
           TextButton(
             onPressed: () {
@@ -74,7 +72,7 @@ class _ProfileScreenState extends State<ProfileScreen>
             child: Text(
               'Se déconnecter',
               style: AppTypography.sans(
-                  color: AppColors.error, weight: FontWeight.w600),
+                  color: AppColors.error, weight: FontWeight.w700),
             ),
           ),
         ],
@@ -93,19 +91,24 @@ class _ProfileScreenState extends State<ProfileScreen>
         actions: [
           Obx(() {
             if (_auth.authToken.value.isEmpty) return const SizedBox.shrink();
-            return Row(
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.notifications_none_rounded, size: 22),
-                  onPressed: () => Get.toNamed('/notifications'),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.logout_rounded,
-                      size: 21, color: AppColors.error),
-                  tooltip: 'Se déconnecter',
-                  onPressed: _confirmLogout,
-                ),
-              ],
+            return Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: Row(
+                children: [
+                  TroclyCircleIconBtn(
+                    icon: Icons.notifications_none_rounded,
+                    tooltip: 'Notifications',
+                    onTap: () => Get.toNamed('/notifications'),
+                  ),
+                  const SizedBox(width: 8),
+                  TroclyCircleIconBtn(
+                    icon: Icons.logout_rounded,
+                    iconColor: AppColors.error,
+                    tooltip: 'Se déconnecter',
+                    onTap: _confirmLogout,
+                  ),
+                ],
+              ),
             );
           }),
         ],
@@ -137,250 +140,455 @@ class _ProfileScreenState extends State<ProfileScreen>
         final avgRating = stats?.averageRating ?? 0.0;
         final totalReviews = stats?.totalReviews ?? 0;
 
-        return Column(
-          children: [
-            // Identity header
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 32,
-                    backgroundColor: AppColors.bubble,
-                    child: Text(
-                      initials.isEmpty ? 'T' : initials,
-                      style: AppTypography.serif(size: 21),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+        return RefreshIndicator(
+          onRefresh: _refreshProfileData,
+          color: AppColors.accent,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 28),
+            children: [
+              // Avatar centré moderne (style Account du modèle)
+              Center(
+                child: Column(
+                  children: [
+                    Stack(
+                      clipBehavior: Clip.none,
                       children: [
-                        Text(displayName, style: AppTypography.serif(size: 22)),
-                        const SizedBox(height: 2),
-                        Text(
-                          '${_auth.selectedCity.value}${_auth.phone.value.isNotEmpty ? ' · ${_auth.phone.value}' : ''}',
-                          style: AppTypography.sans(
-                              size: 12.5, color: AppColors.textSecondary),
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            const Icon(Icons.verified_user_outlined,
-                                size: 14, color: AppColors.success),
-                            const SizedBox(width: 5),
-                            Text(
-                              'Téléphone vérifié',
-                              style: AppTypography.sans(
-                                size: 11.5,
-                                weight: FontWeight.w500,
-                                color: AppColors.success,
-                              ),
+                        Container(
+                          width: 92,
+                          height: 92,
+                          decoration: BoxDecoration(
+                            color: AppColors.imagePlaceholder,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                                color: AppColors.surface, width: 4),
+                            boxShadow: AppColors.cardShadow,
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            initials.isEmpty ? 'T' : initials,
+                            style: AppTypography.serif(
+                              size: 28,
+                              color: AppColors.ink,
                             ),
-                          ],
+                          ),
+                        ),
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: Container(
+                            width: 30,
+                            height: 30,
+                            decoration: BoxDecoration(
+                              color: AppColors.accent,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                  color: AppColors.surface, width: 2.5),
+                            ),
+                            child: const Icon(
+                              Icons.verified_rounded,
+                              size: 15,
+                              color: Colors.white,
+                            ),
+                          ),
                         ),
                       ],
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 12),
+                    Text(displayName, style: AppTypography.serif(size: 22)),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${_auth.selectedCity.value}${_auth.phone.value.isNotEmpty ? ' · ${_auth.phone.value}' : ''}',
+                      style: AppTypography.sans(
+                          size: 12.5, color: AppColors.textSecondary),
+                    ),
+                  ],
+                ),
               ),
-            ),
+              const SizedBox(height: 18),
 
-            // 3-column hairline trust stats
-            Container(
-              margin: const EdgeInsets.fromLTRB(20, 18, 20, 0),
-              padding: const EdgeInsets.symmetric(vertical: 13),
-              decoration: const BoxDecoration(
-                border: Border.symmetric(
-                    horizontal: BorderSide(color: AppColors.line)),
+              // Carte blanche stats de confiance (3 colonnes)
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: AppColors.cardShadow,
+                ),
+                child: Row(
+                  children: [
+                    _statCell('$trustScore%', 'Confiance', highlight: true),
+                    Container(width: 1, height: 34, color: AppColors.line),
+                    _statCell('$exchanges', 'Échanges'),
+                    Container(width: 1, height: 34, color: AppColors.line),
+                    _statCell(
+                      totalReviews > 0
+                          ? avgRating.toStringAsFixed(1).replaceAll('.', ',')
+                          : '—',
+                      '$totalReviews avis',
+                    ),
+                  ],
+                ),
               ),
-              child: Row(
-                children: [
-                  _statCell('$trustScore', 'Confiance'),
-                  Container(width: 1, height: 32, color: AppColors.line),
-                  _statCell('$exchanges', 'Échanges'),
-                  Container(width: 1, height: 32, color: AppColors.line),
-                  _statCell(
-                    totalReviews > 0
-                        ? avgRating.toStringAsFixed(1).replaceAll('.', ',')
-                        : '—',
-                    '$totalReviews avis',
-                  ),
-                ],
-              ),
-            ),
+              const SizedBox(height: 18),
 
-            // Readable ink tabs (Mes annonces / Historique / Avis)
-            Container(
-              margin: const EdgeInsets.only(top: 6),
-              decoration: const BoxDecoration(
-                border: Border(bottom: BorderSide(color: AppColors.line)),
+              // Barre d'onglets pilules blanches + capsule corail active
+              Container(
+                padding: const EdgeInsets.all(5),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(26),
+                  boxShadow: AppColors.pillShadow,
+                ),
+                child: Row(
+                  children: [
+                    _pillTab(0, 'Annonces (${_listings.myListings.length})'),
+                    _pillTab(1, 'RDV (${_meetings.myMeetings.length})'),
+                    _pillTab(2, 'Avis ($totalReviews)'),
+                  ],
+                ),
               ),
-              child: TabBar(
-                controller: _tabController,
-                indicatorColor: AppColors.ink,
-                indicatorWeight: 2,
-                labelColor: AppColors.ink,
-                unselectedLabelColor: AppColors.textSecondary,
-                labelStyle:
-                    AppTypography.sans(size: 13, weight: FontWeight.w600),
-                unselectedLabelStyle: AppTypography.sans(size: 13),
-                dividerColor: Colors.transparent,
-                tabs: [
-                  Tab(text: 'Mes annonces (${_listings.myListings.length})'),
-                  Tab(text: 'Historique (${_meetings.myMeetings.length})'),
-                  Tab(text: 'Avis ($totalReviews)'),
-                ],
-              ),
-            ),
+              const SizedBox(height: 16),
 
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  _buildMyListings(),
-                  _buildHistoryList(),
-                  _buildReviewsList(stats?.reviews ?? const []),
-                ],
+              // Contenu de l'onglet sélectionné
+              if (_selectedTab == 0) _buildMyListings(),
+              if (_selectedTab == 1) _buildHistoryList(),
+              if (_selectedTab == 2)
+                _buildReviewsList(stats?.reviews ?? const []),
+
+              const SizedBox(height: 18),
+
+              // Raccourcis en cartes blanches (style menu Account)
+              _menuCardTile(
+                icon: Icons.add_box_outlined,
+                title: 'Publier un nouvel objet',
+                onTap: () => Get.toNamed('/publish'),
               ),
-            ),
-          ],
+              const SizedBox(height: 10),
+              _menuCardTile(
+                icon: Icons.inventory_2_outlined,
+                title: 'Gérer toutes mes annonces',
+                onTap: () => Get.toNamed('/my-listings'),
+              ),
+              const SizedBox(height: 10),
+              _menuCardTile(
+                icon: Icons.logout_rounded,
+                title: 'Se déconnecter',
+                iconColor: AppColors.error,
+                titleColor: AppColors.error,
+                onTap: _confirmLogout,
+              ),
+            ],
+          ),
         );
       }),
     );
   }
 
-  Widget _statCell(String number, String label) {
+  Widget _pillTab(int index, String label) {
+    final active = _selectedTab == index;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _selectedTab = index),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+          decoration: BoxDecoration(
+            color: active ? AppColors.accent : Colors.transparent,
+            borderRadius: BorderRadius.circular(22),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTypography.sans(
+              size: 12.5,
+              weight: active ? FontWeight.w700 : FontWeight.w500,
+              color: active ? Colors.white : AppColors.textSecondary,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _statCell(String number, String label, {bool highlight = false}) {
     return Expanded(
       child: Column(
         children: [
-          Text(number, style: AppTypography.serif(size: 22)),
+          Text(
+            number,
+            style: AppTypography.serif(
+              size: 20,
+              color: highlight ? AppColors.accent : AppColors.ink,
+            ),
+          ),
           const SizedBox(height: 2),
           Text(label,
-              style: AppTypography.sans(size: 11.5, color: AppColors.textHint)),
+              style:
+                  AppTypography.sans(size: 11.5, color: AppColors.textSecondary)),
         ],
+      ),
+    );
+  }
+
+  Widget _menuCardTile({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+    Color? iconColor,
+    Color? titleColor,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: AppColors.cardShadow,
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: (iconColor ?? AppColors.accent).withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, size: 18, color: iconColor ?? AppColors.accent),
+            ),
+            const SizedBox(width: 13),
+            Expanded(
+              child: Text(
+                title,
+                style: AppTypography.sans(
+                  size: 14,
+                  weight: FontWeight.w600,
+                  color: titleColor ?? AppColors.ink,
+                ),
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded,
+                color: titleColor ?? AppColors.textHint),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildMyListings() {
     if (_listings.isMyListingsLoading.value) {
-      return const Center(
-        child: CircularProgressIndicator(color: AppColors.ink, strokeWidth: 2),
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 28),
+        child: Center(
+          child: CircularProgressIndicator(
+              color: AppColors.accent, strokeWidth: 2.5),
+        ),
       );
     }
     final items = _listings.myListings;
     if (items.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('Vous n\'avez pas encore publié d\'annonce',
-                  style: AppTypography.serif(size: 19)),
-              const SizedBox(height: 12),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 220),
-                child: PrimaryButton(
-                  label: 'Publier un objet',
-                  onPressed: () => Get.toNamed('/publish'),
-                ),
+      return Container(
+        padding: const EdgeInsets.all(22),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: AppColors.cardShadow,
+        ),
+        child: Column(
+          children: [
+            Text('Aucune annonce publiée',
+                style: AppTypography.serif(size: 17)),
+            const SizedBox(height: 6),
+            Text(
+              'Ajoutez un objet pour commencer à proposer des échanges.',
+              textAlign: TextAlign.center,
+              style:
+                  AppTypography.sans(size: 12.5, color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 16),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 210),
+              child: PrimaryButton(
+                label: 'Publier un objet',
+                height: 44,
+                onPressed: () => Get.toNamed('/publish'),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       );
     }
 
-    return RefreshIndicator(
-      onRefresh: () => _listings.fetchMyListings(),
-      color: AppColors.ink,
-      child: ListView.separated(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-        itemCount: items.length,
-        separatorBuilder: (_, __) => const Divider(),
-        itemBuilder: (_, idx) {
-          final item = items[idx];
-          return ListTile(
-            contentPadding: const EdgeInsets.symmetric(vertical: 4),
-            leading: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Container(
-                width: 52,
-                height: 52,
-                color: AppColors.imagePlaceholder,
-                child: item.photos.isNotEmpty
-                    ? Image.network(item.photos.first, fit: BoxFit.cover)
-                    : const Icon(Icons.photo_outlined,
-                        color: AppColors.textHint),
-              ),
+    return Column(
+      children: items.map((item) {
+        return GestureDetector(
+          onTap: () => Get.toNamed('/listing/${item.id}', arguments: item),
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: AppColors.cardShadow,
             ),
-            title: Text(item.title,
-                style: AppTypography.sans(size: 14, weight: FontWeight.w600)),
-            subtitle: Text('${item.condition} · ${item.city} · ${item.status}',
-                style: AppTypography.sans(
-                    size: 12, color: AppColors.textSecondary)),
-            trailing: const Icon(Icons.chevron_right_rounded,
-                color: AppColors.textHint),
-            onTap: () => Get.toNamed('/listing/${item.id}', arguments: item),
-          );
-        },
-      ),
+            child: Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: Container(
+                    width: 60,
+                    height: 60,
+                    color: AppColors.imagePlaceholder,
+                    child: item.photos.isNotEmpty
+                        ? Image.network(item.photos.first, fit: BoxFit.cover)
+                        : const Icon(Icons.photo_outlined,
+                            color: AppColors.textSecondary),
+                  ),
+                ),
+                const SizedBox(width: 13),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(item.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTypography.sans(
+                              size: 14.5, weight: FontWeight.w700)),
+                      const SizedBox(height: 4),
+                      Text('${item.condition} · ${item.city}',
+                          style: AppTypography.sans(
+                              size: 12, color: AppColors.textSecondary)),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: item.status == 'active'
+                        ? AppColors.successLight
+                        : AppColors.bubble,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Text(
+                    item.status == 'active' ? 'Active' : item.status,
+                    style: AppTypography.sans(
+                      size: 11,
+                      weight: FontWeight.w700,
+                      color: item.status == 'active'
+                          ? AppColors.success
+                          : AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 
   Widget _buildHistoryList() {
     final list = _meetings.myMeetings;
     if (list.isEmpty) {
-      return Center(
-        child: Text(
-          'Aucun rendez-vous enregistré pour le moment.',
-          style: AppTypography.sans(size: 13, color: AppColors.textHint),
+      return Container(
+        padding: const EdgeInsets.all(22),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: AppColors.cardShadow,
+        ),
+        child: Center(
+          child: Text(
+            'Aucun rendez-vous enregistré pour le moment.',
+            style: AppTypography.sans(size: 13, color: AppColors.textSecondary),
+          ),
         ),
       );
     }
-    return ListView.separated(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      itemCount: list.length,
-      separatorBuilder: (_, __) => const Divider(),
-      itemBuilder: (_, idx) {
-        final m = list[idx];
-        return ListTile(
-          contentPadding: EdgeInsets.zero,
-          title: Text(m.proposedLocation,
-              style: AppTypography.sans(size: 13.5, weight: FontWeight.w500)),
-          subtitle: Text(
-            '${m.scheduledAt.day}/${m.scheduledAt.month}/${m.scheduledAt.year} · ${m.status}',
-            style:
-                AppTypography.sans(size: 12, color: AppColors.textSecondary),
-          ),
-          trailing: const Icon(Icons.chevron_right_rounded,
-              color: AppColors.textHint),
+    return Column(
+      children: list.map((m) {
+        return GestureDetector(
           onTap: () => Get.toNamed('/my-qr/${m.id}'),
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: AppColors.cardShadow,
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: const BoxDecoration(
+                    color: AppColors.accentLight,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.qr_code_2_rounded,
+                      size: 20, color: AppColors.accent),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(m.proposedLocation,
+                          style: AppTypography.sans(
+                              size: 14, weight: FontWeight.w700)),
+                      const SizedBox(height: 3),
+                      Text(
+                        '${m.scheduledAt.day}/${m.scheduledAt.month}/${m.scheduledAt.year} · ${m.status}',
+                        style: AppTypography.sans(
+                            size: 12, color: AppColors.textSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right_rounded,
+                    color: AppColors.textHint),
+              ],
+            ),
+          ),
         );
-      },
+      }).toList(),
     );
   }
 
   Widget _buildReviewsList(List<ReviewModel> reviews) {
     if (reviews.isEmpty) {
-      return Center(
-        child: Text(
-          'Aucun avis reçu pour le moment.',
-          style: AppTypography.sans(size: 13, color: AppColors.textHint),
+      return Container(
+        padding: const EdgeInsets.all(22),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: AppColors.cardShadow,
+        ),
+        child: Center(
+          child: Text(
+            'Aucun avis reçu pour le moment.',
+            style: AppTypography.sans(size: 13, color: AppColors.textSecondary),
+          ),
         ),
       );
     }
-    return ListView.separated(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      itemCount: reviews.length,
-      separatorBuilder: (_, __) => const Divider(),
-      itemBuilder: (_, idx) {
-        final r = reviews[idx];
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
+    return Column(
+      children: reviews.map((r) {
+        return Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.all(15),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: AppColors.cardShadow,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -389,7 +597,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                 children: [
                   Text(r.reviewerName,
                       style: AppTypography.sans(
-                          size: 13.5, weight: FontWeight.w600)),
+                          size: 14, weight: FontWeight.w700)),
                   Row(
                     children: List.generate(
                       5,
@@ -397,9 +605,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                         i < r.rating
                             ? Icons.star_rounded
                             : Icons.star_outline_rounded,
-                        size: 14,
+                        size: 16,
                         color: i < r.rating
-                            ? AppColors.ink
+                            ? const Color(0xFFF5B400)
                             : AppColors.borderStrong,
                       ),
                     ),
@@ -407,15 +615,17 @@ class _ProfileScreenState extends State<ProfileScreen>
                 ],
               ),
               if (r.comment.isNotEmpty) ...[
-                const SizedBox(height: 4),
+                const SizedBox(height: 6),
                 Text(r.comment,
                     style: AppTypography.sans(
-                        size: 13, color: AppColors.textSecondary)),
+                        size: 13,
+                        color: AppColors.textSecondary,
+                        height: 1.45)),
               ],
             ],
           ),
         );
-      },
+      }).toList(),
     );
   }
 }
