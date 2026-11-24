@@ -8,6 +8,7 @@ import 'package:trocly_mobile/controllers/meeting_controller.dart';
 import 'package:trocly_mobile/controllers/offers_controller.dart';
 import 'package:trocly_mobile/core/widgets/state_page.dart';
 import 'package:trocly_mobile/features/feed/presentation/screens/listing_detail_screen.dart';
+import 'package:trocly_mobile/features/feed/presentation/screens/splash_screen.dart';
 import 'package:trocly_mobile/features/meeting/presentation/screens/qr_screen.dart';
 import 'package:trocly_mobile/features/offers/presentation/screens/chat_screen.dart';
 import 'package:trocly_mobile/features/offers/presentation/screens/messages_inbox_screen.dart';
@@ -238,6 +239,21 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Accepter et générer les QR'), findsOneWidget);
+    });
+
+    testWidgets('SplashScreen renders without bottom overflow on iPhone SE (375x667)',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(375, 667);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      Get.put(AuthController());
+      await tester.pumpWidget(const GetMaterialApp(home: SplashScreen()));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('Explorer les annonces'), findsOneWidget);
     });
   });
 }
