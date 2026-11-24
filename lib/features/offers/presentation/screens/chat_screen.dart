@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../../../controllers/auth_controller.dart';
 import '../../../../controllers/chat_controller.dart';
 import '../../../../controllers/offers_controller.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -14,6 +15,7 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
+  final AuthController _authController = Get.find<AuthController>();
   final ChatController _chatController = Get.find<ChatController>();
   final OffersController _offersController = Get.find<OffersController>();
   final _textController = TextEditingController();
@@ -21,6 +23,12 @@ class _ChatScreenState extends State<ChatScreen> {
 
   String? _offerId;
   ConversationModel? _conversation;
+  String _offerStatus = 'pending';
+  bool _isResponder = false;
+  String _otherUserName = 'Conversation';
+  String _otherUserId = '';
+  String _itemSummary = '';
+  double _soulte = 0;
 
   @override
   void initState() {
@@ -28,6 +36,12 @@ class _ChatScreenState extends State<ChatScreen> {
     _offerId = Get.parameters['offerId'];
     if (Get.arguments is ConversationModel) {
       _conversation = Get.arguments as ConversationModel;
+      _offerStatus = _conversation!.offerStatus;
+      _isResponder = _conversation!.isResponder;
+      _otherUserName = _conversation!.otherUserName;
+      _otherUserId = _conversation!.otherUserId;
+      _itemSummary = _conversation!.itemSummary;
+      _soulte = _conversation!.soulte;
     }
     if (_offerId != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -35,6 +49,31 @@ class _ChatScreenState extends State<ChatScreen> {
         _chatController.messages.clear();
         _chatController.loadMessages(_offerId!);
         _chatController.connectWebSocket(_offerId!);
+        _refreshOfferDetails();
+      });
+    }
+  }
+
+  Future<void> _refreshOfferDetails() async {
+    if (_offerId == null) return;
+    final offer = await _offersController.fetchOfferById(_offerId!);
+    if (offer != null && mounted) {
+      final uid = _authController.userId.value;
+      final responder = offer.responderId.isNotEmpty && offer.responderId == uid;
+      setState(() {
+        _offerStatus = offer.status;
+        _isResponder = responder;
+        _soulte = offer.soulte ?? _soulte;
+        if (responder) {
+          if (offer.initiatorName.isNotEmpty) _otherUserName = offer.initiatorName;
+          if (offer.initiatorId.isNotEmpty) _otherUserId = offer.initiatorId;
+        } else {
+          if (offer.responderName.isNotEmpty) _otherUserName = offer.responderName;
+          if (offer.responderId.isNotEmpty) _otherUserId = offer.responderId;
+        }
+        if (_itemSummary.isEmpty && offer.items.isNotEmpty) {
+          _itemSummary = offer.items.map((e) => e.title).join(' contre ');
+        }
       });
     }
   }
@@ -57,15 +96,16 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final otherName = _conversation?.otherUserName ?? 'Conversation';
+    final otherName = _otherUserName;
     final initials = otherName
         .split(' ')
         .where((p) => p.isNotEmpty)
         .take(2)
         .map((p) => p[0].toUpperCase())
         .join();
-    final status = _conversation?.offerStatus ?? 'pending';
-    final soulte = _conversation?.soulte ?? 0;
+    final status = _offerStatus;
+    final soulte = _soulte;
+    final canPlanMeeting = status == 'accepted';
 
     return Scaffold(
       backgroundColor: AppColors.paper,
@@ -112,19 +152,20 @@ class _ChatScreenState extends State<ChatScreen> {
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.calendar_today_outlined, size: 20),
-            tooltip: 'Proposer un rendez-vous',
-            onPressed: () {
-              if (_offerId != null) {
-                Get.toNamed('/plan-meeting/$_offerId', arguments: {
-                  'offerId': _offerId,
-                  'responderId': _conversation?.otherUserId,
-                  'otherUserName': otherName,
-                });
-              }
-            },
-          ),
+          if (canPlanMeeting)
+            IconButton(
+              icon: const Icon(Icons.calendar_today_outlined, size: 20, color: AppColors.accent),
+              tooltip: 'Proposer un rendez-vous',
+              onPressed: () {
+                if (_offerId != null) {
+                  Get.toNamed('/plan-meeting/$_offerId', arguments: {
+                    'offerId': _offerId,
+                    'responderId': _otherUserId,
+                    'otherUserName': otherName,
+                  });
+                }
+              },
+            ),
         ],
         bottom: const PreferredSize(
           preferredSize: Size.fromHeight(1),
@@ -151,11 +192,21 @@ class _ChatScreenState extends State<ChatScreen> {
                     Text(
                       status == 'accepted'
                           ? 'OFFRE ACCEPTÉE'
-                          : status == 'countered'
-                              ? 'CONTRE-PROPOSITION'
-                              : 'PROPOSITION EN COURS',
+                          : status == 'rejected'
+                              ? 'OFFRE REFUSÉE'
+                              : status == 'cancelled'
+                                  ? 'OFFRE ANNULÉE'
+                                  : status == 'countered'
+                                      ? 'CONTRE-PROPOSITION'
+                                      : _isResponder
+                                          ? 'PROPOSITION REÇUE'
+                                          : 'PROPOSITION ENVOYÉE',
                       style: AppTypography.eyebrow(
-                        color: status == 'accepted' ? AppColors.success : AppColors.accent,
+                        color: status == 'accepted'
+                            ? AppColors.success
+                            : (status == 'rejected' || status == 'cancelled')
+                                ? AppColors.error
+                                : AppColors.accent,
                       ),
                     ),
                     if (soulte > 0)
@@ -171,23 +222,23 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  (_conversation?.itemSummary.isNotEmpty ?? false)
-                      ? _conversation!.itemSummary
+                  _itemSummary.isNotEmpty
+                      ? _itemSummary
                       : 'Échange en cours de négociation',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: AppTypography.sans(size: 13.5, weight: FontWeight.w500),
+                  style: AppTypography.sans(size: 13.5, weight: FontWeight.w600),
                 ),
                 const SizedBox(height: 11),
                 if (status == 'accepted')
                   SizedBox(
-                    height: 36,
+                    height: 40,
                     width: double.infinity,
                     child: ElevatedButton.icon(
                       onPressed: () {
                         Get.toNamed('/plan-meeting/$_offerId', arguments: {
                           'offerId': _offerId,
-                          'responderId': _conversation?.otherUserId,
+                          'responderId': _otherUserId,
                           'otherUserName': otherName,
                         });
                       },
@@ -195,7 +246,26 @@ class _ChatScreenState extends State<ChatScreen> {
                       label: const Text('Planifier le rendez-vous QR'),
                     ),
                   )
-                else
+                else if (status == 'rejected' || status == 'cancelled')
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.errorLight,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Text(
+                      status == 'rejected'
+                          ? 'Cette proposition d\'échange a été refusée.'
+                          : 'Cette proposition d\'échange a été annulée.',
+                      style: AppTypography.sans(
+                        size: 12,
+                        weight: FontWeight.w500,
+                        color: AppColors.error,
+                      ),
+                    ),
+                  )
+                else if (_isResponder)
                   Row(
                     children: [
                       Expanded(
@@ -205,29 +275,15 @@ class _ChatScreenState extends State<ChatScreen> {
                           fg: AppColors.textSecondary,
                           onTap: () async {
                             if (_offerId != null) {
-                              await _offersController.rejectOffer(_offerId!);
+                              final ok = await _offersController.rejectOffer(_offerId!);
+                              if (ok && mounted) {
+                                setState(() => _offerStatus = 'rejected');
+                              }
                             }
                           },
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _compactBtn(
-                          label: 'RDV',
-                          borderColor: AppColors.ink,
-                          fg: AppColors.ink,
-                          onTap: () {
-                            if (_offerId != null) {
-                              Get.toNamed('/plan-meeting/$_offerId', arguments: {
-                                'offerId': _offerId,
-                                'responderId': _conversation?.otherUserId,
-                                'otherUserName': otherName,
-                              });
-                            }
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: _compactBtn(
                           label: 'Accepter',
@@ -235,12 +291,41 @@ class _ChatScreenState extends State<ChatScreen> {
                           fg: Colors.white,
                           onTap: () async {
                             if (_offerId != null) {
-                              await _offersController.acceptOffer(_offerId!);
+                              final ok = await _offersController.acceptOffer(_offerId!);
+                              if (ok && mounted) {
+                                setState(() => _offerStatus = 'accepted');
+                              }
                             }
                           },
                         ),
                       ),
                     ],
+                  )
+                else
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                    decoration: BoxDecoration(
+                      color: AppColors.accentLight,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.hourglass_top_rounded,
+                            size: 15, color: AppColors.accent),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'En attente de réponse de $otherName (seul le destinataire peut accepter)',
+                            style: AppTypography.sans(
+                              size: 12,
+                              weight: FontWeight.w600,
+                              color: AppColors.accent,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
               ],
             ),
@@ -344,18 +429,19 @@ class _ChatScreenState extends State<ChatScreen> {
               top: false,
               child: Row(
                 children: [
-                  IconButton(
-                    icon: const Icon(Icons.calendar_today_outlined, size: 20, color: AppColors.textSecondary),
-                    onPressed: () {
-                      if (_offerId != null) {
-                        Get.toNamed('/plan-meeting/$_offerId', arguments: {
-                          'offerId': _offerId,
-                          'responderId': _conversation?.otherUserId,
-                          'otherUserName': otherName,
-                        });
-                      }
-                    },
-                  ),
+                  if (canPlanMeeting)
+                    IconButton(
+                      icon: const Icon(Icons.calendar_today_outlined, size: 20, color: AppColors.accent),
+                      onPressed: () {
+                        if (_offerId != null) {
+                          Get.toNamed('/plan-meeting/$_offerId', arguments: {
+                            'offerId': _offerId,
+                            'responderId': _otherUserId,
+                            'otherUserName': otherName,
+                          });
+                        }
+                      },
+                    ),
                   Expanded(
                     child: TextField(
                       controller: _textController,

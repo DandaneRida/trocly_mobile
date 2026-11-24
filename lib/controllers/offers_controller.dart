@@ -32,6 +32,7 @@ class OfferModel {
   final String id;
   final String initiatorName;
   final String initiatorId;
+  final String responderName;
   final String responderId;
   final List<OfferItemModel> items;
   final double? soulte;
@@ -43,6 +44,7 @@ class OfferModel {
     required this.id,
     required this.initiatorName,
     required this.initiatorId,
+    this.responderName = 'Membre',
     required this.responderId,
     required this.items,
     this.soulte,
@@ -56,6 +58,7 @@ class OfferModel {
       id: json['id']?.toString() ?? '',
       initiatorName: json['initiator']?['displayName'] ?? 'Membre',
       initiatorId: json['initiator']?['id']?.toString() ?? '',
+      responderName: json['responder']?['displayName'] ?? 'Membre',
       responderId: json['responder']?['id']?.toString() ?? '',
       items: (json['items'] as List? ?? [])
           .where((item) => item['listing'] != null)
@@ -127,6 +130,21 @@ class OffersController extends GetxController {
     } finally {
       isLoading.value = false;
     }
+  }
+
+  /// Fetch single offer details (status, initiator/responder roles)
+  Future<OfferModel?> fetchOfferById(String offerId) async {
+    if (_auth.authToken.value.isEmpty) return null;
+    try {
+      final resp = await http.get(
+        Uri.parse('$_apiUrl/offers/$offerId'),
+        headers: _headers(),
+      );
+      if (resp.statusCode == 200) {
+        return OfferModel.fromJson(jsonDecode(resp.body));
+      }
+    } catch (_) {}
+    return null;
   }
 
   /// C1 - Create multi-object offer (JWT authenticated, mandatory >= 1 item, soultePossible boolean)

@@ -253,33 +253,89 @@ class _QrScreenState extends State<QrScreen> {
                           Padding(
                             padding: const EdgeInsets.fromLTRB(18, 12, 18, 22),
                             child: meeting.status == 'proposed'
-                                ? Column(
-                                    children: [
-                                      const Icon(Icons.hourglass_top_rounded,
-                                          size: 36, color: AppColors.textSecondary),
-                                      const SizedBox(height: 10),
-                                      Text(
-                                        'En attente d\'acceptation',
-                                        style: AppTypography.serif(size: 20),
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Text(
-                                        'Une fois le rendez-vous accepté, vos deux codes QR personnels apparaîtront ici.',
-                                        textAlign: TextAlign.center,
-                                        style: AppTypography.sans(
-                                          size: 12.5,
-                                          color: AppColors.textSecondary,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 16),
-                                      PrimaryButton(
-                                        label: 'Accepter et générer les QR',
-                                        isLoading: _meetingController.isLoading.value,
-                                        onPressed: () =>
-                                            _meetingController.acceptMeeting(meeting.id),
-                                      ),
-                                    ],
-                                  )
+                                ? (meeting.isInitiator(uid)
+                                    ? Column(
+                                        children: [
+                                          Container(
+                                            width: 56,
+                                            height: 56,
+                                            decoration: const BoxDecoration(
+                                              color: AppColors.accentLight,
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: const Icon(
+                                              Icons.hourglass_top_rounded,
+                                              size: 28,
+                                              color: AppColors.accent,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 12),
+                                          Text(
+                                            'En attente de $partnerName',
+                                            textAlign: TextAlign.center,
+                                            style: AppTypography.serif(size: 19),
+                                          ),
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            'Votre proposition de rendez-vous a été envoyée. Seul $partnerName peut l\'accepter pour générer vos deux codes QR.',
+                                            textAlign: TextAlign.center,
+                                            style: AppTypography.sans(
+                                              size: 12.5,
+                                              color: AppColors.textSecondary,
+                                              height: 1.45,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 16),
+                                          PrimaryButton(
+                                            label: 'Actualiser le statut',
+                                            icon: Icons.refresh_rounded,
+                                            isOutlined: true,
+                                            isLoading: _meetingController.isLoading.value,
+                                            onPressed: () =>
+                                                _meetingController.fetchMeeting(meeting.id),
+                                          ),
+                                        ],
+                                      )
+                                    : Column(
+                                        children: [
+                                          Container(
+                                            width: 56,
+                                            height: 56,
+                                            decoration: const BoxDecoration(
+                                              color: AppColors.accentLight,
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: const Icon(
+                                              Icons.event_available_rounded,
+                                              size: 28,
+                                              color: AppColors.accent,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 12),
+                                          Text(
+                                            'Proposition de $partnerName',
+                                            textAlign: TextAlign.center,
+                                            style: AppTypography.serif(size: 19),
+                                          ),
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            'Acceptez ce rendez-vous pour générer vos deux codes QR personnels de validation.',
+                                            textAlign: TextAlign.center,
+                                            style: AppTypography.sans(
+                                              size: 12.5,
+                                              color: AppColors.textSecondary,
+                                              height: 1.45,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 16),
+                                          PrimaryButton(
+                                            label: 'Accepter et générer les QR',
+                                            isLoading: _meetingController.isLoading.value,
+                                            onPressed: () =>
+                                                _meetingController.acceptMeeting(meeting.id),
+                                          ),
+                                        ],
+                                      ))
                                 : Column(
                                     children: [
                                       if (myQr != null && myQr.isNotEmpty)

@@ -8,6 +8,7 @@ import 'package:trocly_mobile/controllers/meeting_controller.dart';
 import 'package:trocly_mobile/controllers/offers_controller.dart';
 import 'package:trocly_mobile/core/widgets/state_page.dart';
 import 'package:trocly_mobile/features/feed/presentation/screens/listing_detail_screen.dart';
+import 'package:trocly_mobile/features/meeting/presentation/screens/qr_screen.dart';
 import 'package:trocly_mobile/features/offers/presentation/screens/chat_screen.dart';
 import 'package:trocly_mobile/features/offers/presentation/screens/messages_inbox_screen.dart';
 import 'package:trocly_mobile/features/offers/presentation/screens/propose_offer_screen.dart';
@@ -201,7 +202,42 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(tester.takeException(), isNull);
-      expect(find.text('PROPOSITION EN COURS'), findsOneWidget);
+      expect(find.text('PROPOSITION ENVOYÉE'), findsOneWidget);
+      expect(find.text('Accepter'), findsNothing);
+      expect(find.text('Refuser'), findsNothing);
+    });
+
+    testWidgets('QrScreen hides Accepter et générer les QR for the meeting proposer and shows it only for responder',
+        (WidgetTester tester) async {
+      final auth = Get.put(AuthController());
+      final meetings = Get.put(MeetingController());
+
+      final proposedMeeting = MeetingModel.fromJson({
+        'id': 'm-prop',
+        'offerId': 'o-1',
+        'initiator': {'id': 'user-proposer', 'displayName': 'Yassine'},
+        'responder': {'id': 'user-responder', 'displayName': 'Salma'},
+        'proposedLocation': 'Place El Hedim, Meknès',
+        'scheduledAt': '2026-11-25T15:00:00Z',
+        'expiresAt': '2026-11-25T17:00:00Z',
+        'status': 'proposed',
+      });
+      meetings.currentMeeting.value = proposedMeeting;
+
+      // Case 1: Logged in as proposer -> button MUST NOT appear
+      auth.userId.value = 'user-proposer';
+      await tester.pumpWidget(const GetMaterialApp(home: QrScreen()));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Accepter et générer les QR'), findsNothing);
+      expect(find.text('En attente de Salma'), findsOneWidget);
+
+      // Case 2: Logged in as responder -> button MUST appear
+      auth.userId.value = 'user-responder';
+      await tester.pumpWidget(const GetMaterialApp(home: QrScreen()));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Accepter et générer les QR'), findsOneWidget);
     });
   });
 }
