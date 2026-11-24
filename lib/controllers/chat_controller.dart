@@ -43,7 +43,11 @@ class ConversationModel {
           ? double.tryParse(json['soulte'].toString()) ?? 0
           : 0,
       isResponder: json['isResponder'] == true,
-      itemSummary: json['itemSummary'] ?? '',
+      itemSummary: (json['itemSummary'] ?? '')
+          .toString()
+          .replaceAll('⇄', ' contre ')
+          .replaceAll(RegExp(r'\s+'), ' ')
+          .trim(),
       lastMessageAt: json['lastMessageAt'] != null
           ? DateTime.tryParse(json['lastMessageAt'].toString())
           : null,
@@ -103,6 +107,7 @@ class ChatController extends GetxController {
   final conversations = <ConversationModel>[].obs;
   final typingUsers = <String>[].obs;
   final isLoading = false.obs;
+  final isMessagesLoading = false.obs;
   final isConnected = false.obs;
   final unreadCount = 0.obs;
 
@@ -163,7 +168,7 @@ class ChatController extends GetxController {
 
   Future<void> loadMessages(String offerId) async {
     if (_auth.authToken.value.isEmpty) return;
-    isLoading.value = true;
+    isMessagesLoading.value = true;
     try {
       final resp = await http.get(
         Uri.parse('$_apiUrl/messages/offer/$offerId?page=1&limit=50'),
@@ -179,7 +184,7 @@ class ChatController extends GetxController {
     } catch (e) {
       debugPrint('Error loadMessages: $e');
     } finally {
-      isLoading.value = false;
+      isMessagesLoading.value = false;
     }
   }
 
@@ -298,7 +303,7 @@ class ChatController extends GetxController {
     }
   }
 
-  void disconnectWebSocket() {
+  void disconnectWebSocket({bool silent = false}) {
     _typingTimer?.cancel();
     if (_socket != null) {
       if (_activeOfferId != null) {
@@ -308,8 +313,10 @@ class ChatController extends GetxController {
       _socket = null;
     }
     _activeOfferId = null;
-    isConnected.value = false;
-    typingUsers.clear();
+    if (!silent) {
+      isConnected.value = false;
+      typingUsers.clear();
+    }
   }
 
   @override

@@ -30,14 +30,18 @@ class _ChatScreenState extends State<ChatScreen> {
       _conversation = Get.arguments as ConversationModel;
     }
     if (_offerId != null) {
-      _chatController.loadMessages(_offerId!);
-      _chatController.connectWebSocket(_offerId!);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _offerId == null) return;
+        _chatController.messages.clear();
+        _chatController.loadMessages(_offerId!);
+        _chatController.connectWebSocket(_offerId!);
+      });
     }
   }
 
   @override
   void dispose() {
-    _chatController.disconnectWebSocket();
+    _chatController.disconnectWebSocket(silent: true);
     _textController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -129,14 +133,14 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       body: Column(
         children: [
-          // Pinned offer summary card (matching Phone 5 of v3 mockup)
+          // Pinned offer summary card (modern white rounded card)
           Container(
             margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            padding: const EdgeInsets.all(13),
+            padding: const EdgeInsets.all(15),
             decoration: BoxDecoration(
               color: AppColors.surface,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.line),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: AppColors.cardShadow,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -227,7 +231,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       Expanded(
                         child: _compactBtn(
                           label: 'Accepter',
-                          bg: AppColors.ink,
+                          bg: AppColors.accent,
                           fg: Colors.white,
                           onTap: () async {
                             if (_offerId != null) {
@@ -248,11 +252,18 @@ class _ChatScreenState extends State<ChatScreen> {
               final messages = _chatController.messages;
               final typing = _chatController.typingUsers;
 
-              if (messages.isEmpty && !_chatController.isLoading.value) {
+              if (messages.isEmpty && _chatController.isMessagesLoading.value) {
+                return const Center(
+                  child: CircularProgressIndicator(
+                      color: AppColors.accent, strokeWidth: 2.5),
+                );
+              }
+
+              if (messages.isEmpty && !_chatController.isMessagesLoading.value) {
                 return Center(
                   child: Text(
                     'Envoyez un premier message pour convenir des détails.',
-                    style: AppTypography.sans(size: 13, color: AppColors.textHint),
+                    style: AppTypography.sans(size: 13, color: AppColors.textSecondary),
                   ),
                 );
               }
@@ -284,13 +295,14 @@ class _ChatScreenState extends State<ChatScreen> {
                         maxWidth: MediaQuery.of(context).size.width * 0.76,
                       ),
                       decoration: BoxDecoration(
-                        color: isMe ? AppColors.ink : AppColors.bubble,
+                        color: isMe ? AppColors.accent : AppColors.surface,
                         borderRadius: BorderRadius.only(
-                          topLeft: const Radius.circular(16),
-                          topRight: const Radius.circular(16),
-                          bottomLeft: Radius.circular(isMe ? 16 : 4),
-                          bottomRight: Radius.circular(isMe ? 4 : 16),
+                          topLeft: const Radius.circular(18),
+                          topRight: const Radius.circular(18),
+                          bottomLeft: Radius.circular(isMe ? 18 : 6),
+                          bottomRight: Radius.circular(isMe ? 6 : 18),
                         ),
+                        boxShadow: AppColors.pillShadow,
                       ),
                       child: Column(
                         crossAxisAlignment:
@@ -378,11 +390,12 @@ class _ChatScreenState extends State<ChatScreen> {
                     onTap: _sendMessage,
                     borderRadius: BorderRadius.circular(20),
                     child: Container(
-                      width: 40,
-                      height: 40,
+                      width: 42,
+                      height: 42,
                       decoration: const BoxDecoration(
-                        color: AppColors.ink,
+                        color: AppColors.accent,
                         shape: BoxShape.circle,
+                        boxShadow: AppColors.coralShadow,
                       ),
                       child: const Icon(Icons.arrow_forward_rounded, size: 19, color: Colors.white),
                     ),
@@ -405,13 +418,13 @@ class _ChatScreenState extends State<ChatScreen> {
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(18),
       child: Container(
-        height: 34,
+        height: 36,
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: bg ?? Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(18),
           border: borderColor != null ? Border.all(color: borderColor) : null,
         ),
         child: Text(

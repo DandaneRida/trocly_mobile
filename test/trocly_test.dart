@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 import 'package:trocly_mobile/controllers/auth_controller.dart';
+import 'package:trocly_mobile/controllers/chat_controller.dart';
 import 'package:trocly_mobile/controllers/listings_controller.dart';
 import 'package:trocly_mobile/controllers/meeting_controller.dart';
 import 'package:trocly_mobile/controllers/offers_controller.dart';
 import 'package:trocly_mobile/core/widgets/state_page.dart';
 import 'package:trocly_mobile/features/feed/presentation/screens/listing_detail_screen.dart';
+import 'package:trocly_mobile/features/offers/presentation/screens/chat_screen.dart';
+import 'package:trocly_mobile/features/offers/presentation/screens/messages_inbox_screen.dart';
 import 'package:trocly_mobile/features/offers/presentation/screens/propose_offer_screen.dart';
 
 void main() {
@@ -163,6 +166,42 @@ void main() {
       expect(find.text('Changer de ville'), findsOneWidget);
       await tester.tap(find.text('Changer de ville'));
       expect(tapped, isTrue);
+    });
+
+    testWidgets('Navigating from MessagesInboxScreen to ChatScreen does not throw markNeedsBuild during build',
+        (WidgetTester tester) async {
+      final auth = Get.put(AuthController());
+      auth.authToken.value = 'fake-jwt';
+      auth.userId.value = 'user-1';
+      final chat = Get.put(ChatController());
+      Get.put(OffersController());
+
+      chat.conversations.value = [
+        ConversationModel.fromJson({
+          'offerId': 'offer-123',
+          'otherUser': {'id': 'user-2', 'displayName': 'Salma'},
+          'lastMessage': 'Nouvelle proposition d\'échange',
+          'status': 'pending',
+          'itemSummary': 'test2 ⇄ gtest',
+        }),
+      ];
+
+      await tester.pumpWidget(GetMaterialApp(
+        home: const MessagesInboxScreen(),
+        getPages: [
+          GetPage(name: '/chat/:offerId', page: () => const ChatScreen()),
+        ],
+      ));
+      await tester.pump();
+
+      expect(find.text('Salma'), findsOneWidget);
+      expect(find.text('test2 contre gtest'), findsOneWidget);
+
+      await tester.tap(find.text('Salma'));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('PROPOSITION EN COURS'), findsOneWidget);
     });
   });
 }
