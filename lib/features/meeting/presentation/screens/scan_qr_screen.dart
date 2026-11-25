@@ -21,13 +21,11 @@ class _ScanQrScreenState extends State<ScanQrScreen> {
   MobileScannerController? _cameraController;
   final _manualController = TextEditingController();
 
-  String? _meetingId;
   bool _isProcessing = false;
 
   @override
   void initState() {
     super.initState();
-    _meetingId = Get.parameters['meetingId'];
     if (!kIsWeb) {
       _cameraController = MobileScannerController();
     }

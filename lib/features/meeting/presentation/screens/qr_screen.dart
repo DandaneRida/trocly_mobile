@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../../controllers/auth_controller.dart';
 import '../../../../controllers/meeting_controller.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -577,7 +578,27 @@ class _QrScreenState extends State<QrScreen> {
                     ],
 
                     if (canCancel) ...[
-                      const SizedBox(height: 18),
+                      const SizedBox(height: 16),
+                      Center(
+                        child: TextButton.icon(
+                          onPressed: () {
+                            Share.share(
+                              '📍 Sécurité Trocly — J\'ai un rendez-vous d\'échange avec $partnerName à « ${meeting.proposedLocation} » le ${dt.day}/${dt.month}/${dt.year} à ${_hhmm(dt)}.',
+                              subject: 'Mon rendez-vous Trocly',
+                            );
+                          },
+                          icon: const Icon(Icons.shield_outlined,
+                              size: 17, color: AppColors.success),
+                          label: Text(
+                            'share_meeting'.tr,
+                            style: AppTypography.sans(
+                              size: 13,
+                              weight: FontWeight.w700,
+                              color: AppColors.success,
+                            ),
+                          ),
+                        ),
+                      ),
                       Center(
                         child: TextButton.icon(
                           onPressed: () => _showCancelDialog(meeting, partnerName),

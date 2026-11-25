@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:trocly_mobile/controllers/auth_controller.dart';
 import 'package:trocly_mobile/controllers/chat_controller.dart';
+import 'package:trocly_mobile/controllers/favorites_controller.dart';
 import 'package:trocly_mobile/controllers/listings_controller.dart';
 import 'package:trocly_mobile/controllers/meeting_controller.dart';
 import 'package:trocly_mobile/controllers/offers_controller.dart';
+import 'package:trocly_mobile/core/i18n/app_translations.dart';
+import 'package:trocly_mobile/core/widgets/skeleton_loader.dart';
 import 'package:trocly_mobile/core/widgets/state_page.dart';
 import 'package:trocly_mobile/features/feed/presentation/screens/listing_detail_screen.dart';
 import 'package:trocly_mobile/features/feed/presentation/screens/splash_screen.dart';
@@ -18,6 +22,7 @@ import 'package:trocly_mobile/features/offers/presentation/screens/propose_offer
 void main() {
   setUp(() {
     Get.testMode = true;
+    SharedPreferences.setMockInitialValues({});
   });
 
   tearDown(() {
@@ -331,6 +336,61 @@ void main() {
       await tester.tap(find.text('Continuer'));
       await tester.pumpAndSettle();
       expect(find.text('Enregistrer les modifications'), findsOneWidget);
+    });
+
+    testWidgets('Phase 1 & 2 — Favorites toggle, Shimmer Skeleton, and Bilingual FR/AR RTL switch work cleanly',
+        (WidgetTester tester) async {
+      Get.put(AuthController());
+      final favs = Get.put(FavoritesController());
+      final localeCtrl = Get.put(LocaleController());
+
+      final sample = ListingModel(
+        id: 'fav-1',
+        title: 'Appareil Canon',
+        description: '',
+        category: 'Électronique',
+        condition: 'bon',
+        estimatedValue: 0,
+        city: 'Meknès',
+        photos: const [],
+        status: 'active',
+        userId: 'u-2',
+      );
+
+      expect(favs.isFavorite('fav-1'), isFalse);
+      await favs.toggleFavorite(sample);
+      expect(favs.isFavorite('fav-1'), isTrue);
+
+      // 1. Verify Shimmer skeleton renders cleanly without overflow
+      await tester.pumpWidget(const MaterialApp(
+        home: Scaffold(
+          body: SizedBox(height: 220, child: ListingGridSkeleton(count: 2)),
+        ),
+      ));
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(find.byType(ShimmerBox), findsWidgets);
+      await tester.pumpWidget(const SizedBox.shrink());
+
+      // 2. Verify Bilingual FR/AR translation & automatic RTL switch
+      await tester.pumpWidget(GetMaterialApp(
+        translations: AppTranslations(),
+        locale: const Locale('fr', 'MA'),
+        fallbackLocale: const Locale('fr', 'MA'),
+        home: Builder(
+          builder: (_) => Scaffold(
+            body: Center(child: Text('nav_home'.tr)),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+      expect(find.text('Accueil'), findsOneWidget);
+
+      await localeCtrl.toggleLanguage();
+      await tester.pumpAndSettle();
+      expect(localeCtrl.isArabic.value, isTrue);
+      expect(find.text('الرئيسية'), findsOneWidget);
+      expect(Directionality.of(tester.element(find.text('الرئيسية'))),
+          TextDirection.rtl);
     });
   });
 }

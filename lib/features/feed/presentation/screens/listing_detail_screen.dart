@@ -1,6 +1,9 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../../controllers/auth_controller.dart';
+import '../../../../controllers/favorites_controller.dart';
 import '../../../../controllers/listings_controller.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -110,13 +113,36 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
         centerTitle: true,
         title: const TroclyAppBarTitle(pageTitle: 'Détails'),
         actions: [
+          if (Get.isRegistered<FavoritesController>())
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Center(
+                child: Obx(() {
+                  final favCtrl = Get.find<FavoritesController>();
+                  final liked = favCtrl.isFavorite(item.id);
+                  return TroclyCircleIconBtn(
+                    icon: liked
+                        ? Icons.favorite_rounded
+                        : Icons.favorite_border_rounded,
+                    iconColor: liked ? AppColors.accent : AppColors.ink,
+                    tooltip: 'Favori',
+                    onTap: () => favCtrl.toggleFavorite(item),
+                  );
+                }),
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.only(right: 16),
             child: Center(
               child: TroclyCircleIconBtn(
                 icon: Icons.ios_share_rounded,
+                tooltip: 'Partager sur WhatsApp',
                 onTap: () {
-                  Get.snackbar('Partage', 'Lien de l\'annonce copié');
+                  final shareText =
+                      '🔄 Découvre « ${item.title} » à échanger sur Trocly (${item.city}) !\n'
+                      'Souhait en échange : ${item.wishSummary}\n'
+                      '👉 https://teriyaki-functional-whale.abasthan.app/listings/${item.id}';
+                  Share.share(shareText, subject: 'Trocly — ${item.title}');
                 },
               ),
             ),
@@ -155,10 +181,15 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
                                   itemCount: photos.length,
                                   onPageChanged: (idx) =>
                                       setState(() => _currentPhotoIndex = idx),
-                                  itemBuilder: (_, i) => Image.network(
-                                    photos[i],
+                                  itemBuilder: (_, i) => CachedNetworkImage(
+                                    imageUrl: photos[i],
                                     fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => const Center(
+                                    placeholder: (_, __) => const Center(
+                                      child: Icon(Icons.photo_outlined,
+                                          size: 44,
+                                          color: AppColors.textSecondary),
+                                    ),
+                                    errorWidget: (_, __, ___) => const Center(
                                       child: Icon(Icons.broken_image_outlined,
                                           size: 44,
                                           color: AppColors.textSecondary),

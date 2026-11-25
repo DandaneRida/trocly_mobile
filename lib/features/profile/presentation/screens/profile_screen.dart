@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../../controllers/auth_controller.dart';
+import '../../../../controllers/favorites_controller.dart';
 import '../../../../controllers/listings_controller.dart';
 import '../../../../controllers/meeting_controller.dart';
 import '../../../../controllers/reviews_controller.dart';
+import '../../../../core/i18n/app_translations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/primary_button.dart';
@@ -258,9 +260,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: 18),
 
               // Raccourcis en cartes blanches (style menu Account)
+              if (Get.isRegistered<FavoritesController>())
+                Obx(() {
+                  final favCount =
+                      Get.find<FavoritesController>().favoriteIds.length;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _menuCardTile(
+                      icon: Icons.favorite_border_rounded,
+                      title: '${'favorites'.tr} ($favCount)',
+                      onTap: () => Get.toNamed('/favorites'),
+                    ),
+                  );
+                }),
               _menuCardTile(
                 icon: Icons.add_box_outlined,
-                title: 'Publier un nouvel objet',
+                title: 'publish_item'.tr,
                 onTap: () => Get.toNamed('/publish'),
               ),
               const SizedBox(height: 10),
@@ -268,6 +283,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 icon: Icons.inventory_2_outlined,
                 title: 'Gérer toutes mes annonces',
                 onTap: () => Get.toNamed('/my-listings'),
+              ),
+              const SizedBox(height: 10),
+              if (Get.isRegistered<LocaleController>())
+                Obx(() {
+                  final localeCtrl = Get.find<LocaleController>();
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _menuCardTile(
+                      icon: Icons.translate_rounded,
+                      title: 'Langue : ${'lang_switch'.tr}',
+                      onTap: localeCtrl.toggleLanguage,
+                    ),
+                  );
+                }),
+              _menuCardTile(
+                icon: Icons.admin_panel_settings_outlined,
+                title: 'admin_panel'.tr,
+                onTap: () => Get.toNamed('/admin'),
               ),
               const SizedBox(height: 10),
               _menuCardTile(

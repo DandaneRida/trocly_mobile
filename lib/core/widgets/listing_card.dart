@@ -1,9 +1,13 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import '../../controllers/favorites_controller.dart';
+import '../../controllers/listings_controller.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 
-/// Carte d'annonce moderne (style carte blanche douce + photo arrondie sur fond bleu-gris
-/// avec pilule flottante « Troc » corail — zéro prix affiché)
+/// Carte d'annonce moderne : photo en cache disque/mémoire (CachedNetworkImage),
+/// bouton Favori cœur flottant, badge ville et pilule « Troc / État » — zéro prix.
 class ListingCard extends StatelessWidget {
   final String id;
   final String title;
@@ -12,6 +16,7 @@ class ListingCard extends StatelessWidget {
   final String? relativeTime;
   final String? photoUrl;
   final String? wishLabel;
+  final ListingModel? listingModel;
   final VoidCallback onTap;
 
   const ListingCard({
@@ -23,6 +28,7 @@ class ListingCard extends StatelessWidget {
     this.relativeTime,
     this.photoUrl,
     this.wishLabel,
+    this.listingModel,
     required this.onTap,
   }) : super(key: key);
 
@@ -52,13 +58,15 @@ class ListingCard extends StatelessWidget {
     final isSpecificWish = wishLabel != null &&
         wishLabel!.trim().isNotEmpty &&
         wishLabel!.toLowerCase() != 'échange ouvert';
+    final favCtrl = Get.isRegistered<FavoritesController>()
+        ? Get.find<FavoritesController>()
+        : null;
 
     return GestureDetector(
       onTap: onTap,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Photo arrondie 20px + pilule flottante Troc en bas
           Expanded(
             child: Stack(
               clipBehavior: Clip.none,
@@ -74,20 +82,22 @@ class ListingCard extends StatelessWidget {
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(20),
                     child: hasPhoto
-                        ? Image.network(
-                            photoUrl!,
+                        ? CachedNetworkImage(
+                            imageUrl: photoUrl!,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => _placeholder(),
+                            placeholder: (_, __) => _placeholder(),
+                            errorWidget: (_, __, ___) => _placeholder(),
                           )
                         : _placeholder(),
                   ),
                 ),
-                // Badge ville discret en haut à gauche
+                // Badge ville en haut à gauche
                 Positioned(
                   top: 8,
                   left: 8,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: AppColors.surface.withValues(alpha: 0.92),
                       borderRadius: BorderRadius.circular(14),
@@ -113,7 +123,50 @@ class ListingCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                // Pilule flottante « Troc » inspirée du design moderne
+                // Bouton Favori cœur en haut à droite (Phase 1.3)
+                if (favCtrl != null)
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Obx(() {
+                      final liked = favCtrl.isFavorite(id);
+                      return GestureDetector(
+                        onTap: () {
+                          final model = listingModel ??
+                              ListingModel(
+                                id: id,
+                                title: title,
+                                description: '',
+                                category: '',
+                                condition: condition ?? 'bon',
+                                estimatedValue: 0,
+                                city: cityName ?? 'Meknès',
+                                photos: hasPhoto ? [photoUrl!] : const [],
+                                status: 'active',
+                                userId: '',
+                              );
+                          favCtrl.toggleFavorite(model);
+                        },
+                        child: Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: AppColors.surface.withValues(alpha: 0.94),
+                            shape: BoxShape.circle,
+                            boxShadow: AppColors.pillShadow,
+                          ),
+                          child: Icon(
+                            liked
+                                ? Icons.favorite_rounded
+                                : Icons.favorite_border_rounded,
+                            size: 15,
+                            color: liked ? AppColors.accent : AppColors.ink,
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                // Pilule flottante « Troc / État » en bas
                 Positioned(
                   bottom: -10,
                   left: 10,
@@ -169,7 +222,6 @@ class ListingCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 15),
-          // Titre gras moderne
           Text(
             title,
             maxLines: 1,
@@ -182,7 +234,6 @@ class ListingCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 3),
-          // Souhait d'échange
           Row(
             children: [
               Icon(
@@ -198,7 +249,7 @@ class ListingCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: AppTypography.sans(
                     size: 11.5,
-                    weight: isSpecificWish ? FontWeight.w600 : FontWeight.w400,
+                    weight: isSpecificWish ? FontWeight.w600 : FontWeight.w500,
                     color: isSpecificWish
                         ? AppColors.accent
                         : AppColors.textSecondary,

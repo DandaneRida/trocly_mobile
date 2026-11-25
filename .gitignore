@@ -49,3 +49,9 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Local secrets & Firebase config (keep out of public Git history)
+.env
+.env.*
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist

@@ -15,7 +15,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "ma.ensam.trocly"
+        applicationId = "com.ensam.trocly"
         minSdk = maxOf(flutter.minSdkVersion, 21)
         targetSdk = 34
         // Uses the version code from pubspec.yaml. When using split APKs, 1000 * ABI_VERSION
@@ -43,4 +43,8 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
 }

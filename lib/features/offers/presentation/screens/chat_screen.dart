@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../../controllers/auth_controller.dart';
 import '../../../../controllers/chat_controller.dart';
+import '../../../../controllers/listings_controller.dart';
 import '../../../../controllers/offers_controller.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/primary_button.dart';
 import '../../../../core/widgets/trocly_bottom_nav.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -92,6 +94,158 @@ class _ChatScreenState extends State<ChatScreen> {
     _chatController.sendMessage(_offerId!, text);
     _chatController.setTyping(_offerId!, false);
     _textController.clear();
+  }
+
+  /// Phase 1.2 — Contre-proposition directe depuis le chat (Écran 14)
+  Future<void> _showCounterOfferSheet() async {
+    if (_offerId == null) return;
+    final listingsCtrl = Get.isRegistered<ListingsController>()
+        ? Get.find<ListingsController>()
+        : Get.put(ListingsController());
+    await listingsCtrl.fetchMyListings(status: 'active');
+    if (!mounted) return;
+
+    final selectedIds = <String>{
+      ...listingsCtrl.myListings.take(1).map((e) => e.id),
+    };
+    bool soultePossible = _soulte > 0;
+    final msgCtrl = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.paper,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            final myItems = listingsCtrl.myListings;
+            return SafeArea(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  20,
+                  14,
+                  20,
+                  MediaQuery.of(ctx).viewInsets.bottom + 20,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: AppColors.borderStrong,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text('Contre-proposer',
+                        style: AppTypography.serif(size: 21)),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Ajustez les objets inclus ou l\'option soulte (sans prix fixe).',
+                      style: AppTypography.sans(
+                          size: 12.5, color: AppColors.textSecondary),
+                    ),
+                    const SizedBox(height: 14),
+                    if (myItems.isNotEmpty)
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 170),
+                        child: ListView.separated(
+                          shrinkWrap: true,
+                          itemCount: myItems.length,
+                          separatorBuilder: (_, __) => const SizedBox(height: 6),
+                          itemBuilder: (_, i) {
+                            final it = myItems[i];
+                            final checked = selectedIds.contains(it.id);
+                            return CheckboxListTile(
+                              dense: true,
+                              contentPadding:
+                                  const EdgeInsets.symmetric(horizontal: 10),
+                              tileColor: AppColors.surface,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              activeColor: AppColors.accent,
+                              value: checked,
+                              title: Text(it.title,
+                                  style: AppTypography.sans(
+                                      size: 13.5, weight: FontWeight.w600)),
+                              subtitle: Text(it.city,
+                                  style: AppTypography.sans(
+                                      size: 11.5,
+                                      color: AppColors.textSecondary)),
+                              onChanged: (v) {
+                                setModalState(() {
+                                  if (v == true) {
+                                    selectedIds.add(it.id);
+                                  } else {
+                                    selectedIds.remove(it.id);
+                                  }
+                                });
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Soulte possible (à discuter)',
+                              style: AppTypography.sans(
+                                  size: 13, weight: FontWeight.w600)),
+                          Switch(
+                            value: soultePossible,
+                            activeTrackColor: AppColors.accent,
+                            onChanged: (v) =>
+                                setModalState(() => soultePossible = v),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: msgCtrl,
+                      decoration: const InputDecoration(
+                        hintText: 'Message d\'accompagnement (facultatif)…',
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    PrimaryButton(
+                      label: 'Envoyer la contre-proposition',
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        final counter =
+                            await _offersController.createCounterOffer(
+                          originalOfferId: _offerId!,
+                          counterListingIds: selectedIds.toList(),
+                          soultePossible: soultePossible,
+                          message: msgCtrl.text.trim(),
+                        );
+                        if (counter != null && mounted) {
+                          Get.offNamed('/chat/${counter.id}');
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -304,7 +458,16 @@ class _ChatScreenState extends State<ChatScreen> {
                           },
                         ),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _compactBtn(
+                          label: 'Contre-offre',
+                          borderColor: AppColors.accent,
+                          fg: AppColors.accent,
+                          onTap: _showCounterOfferSheet,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: _compactBtn(
                           label: 'Accepter',
@@ -423,12 +586,29 @@ class _ChatScreenState extends State<ChatScreen> {
                             ),
                           ),
                           const SizedBox(height: 3),
-                          Text(
-                            msg.timestampStr,
-                            style: AppTypography.sans(
-                              size: 10,
-                              color: isMe ? Colors.white60 : AppColors.textHint,
-                            ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                msg.timestampStr,
+                                style: AppTypography.sans(
+                                  size: 10,
+                                  color: isMe ? Colors.white70 : AppColors.textHint,
+                                ),
+                              ),
+                              if (isMe) ...[
+                                const SizedBox(width: 4),
+                                Icon(
+                                  msg.readAt != null
+                                      ? Icons.done_all_rounded
+                                      : Icons.check_rounded,
+                                  size: 13,
+                                  color: msg.readAt != null
+                                      ? Colors.white
+                                      : Colors.white70,
+                                ),
+                              ],
+                            ],
                           ),
                         ],
                       ),

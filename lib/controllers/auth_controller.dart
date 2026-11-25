@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../core/constants/api_constants.dart';
+import '../core/services/fcm_service.dart';
 
 String get apiUrl => ApiConstants.baseUrl;
 
@@ -122,6 +123,7 @@ class AuthController extends GetxController {
         if (data['isNewUser'] == true || data['requiresProfile'] == true) {
           Get.toNamed('/complete-profile');
         } else {
+          FcmService.initAndSyncToken();
           Get.offAllNamed('/feed');
         }
       } else {
@@ -191,6 +193,7 @@ class AuthController extends GetxController {
           userId.value = data['user']['id'].toString();
         }
 
+        FcmService.initAndSyncToken();
         Get.snackbar('Bienvenue', 'Votre profil est prêt.');
         Get.offAllNamed('/feed');
       } else {
@@ -229,21 +232,67 @@ class AuthController extends GetxController {
     Get.offAllNamed('/feed');
   }
 
-  /// Load stored token on app start
+  /// Phase 3.1 — Refresh short-lived JWT automatically via rotating Refresh Token
+  Future<bool> refreshAccessToken() async {
+    final rt = refreshToken.value;
+    if (rt.isEmpty) return false;
+    try {
+      final resp = await client.post(
+        Uri.parse('$apiUrl/auth/refresh'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'refreshToken': rt}),
+      );
+      if (resp.statusCode == 200 || resp.statusCode == 201) {
+        final data = jsonDecode(resp.body);
+        if (data['accessToken'] != null) {
+          authToken.value = data['accessToken'].toString();
+          await storage.write(key: 'accessToken', value: authToken.value);
+          _hydrateFromJwt(authToken.value);
+        }
+        if (data['refreshToken'] != null) {
+          refreshToken.value = data['refreshToken'].toString();
+          await storage.write(key: 'refreshToken', value: refreshToken.value);
+        }
+        return true;
+      }
+    } catch (e) {
+      debugPrint('refreshAccessToken warning: $e');
+    }
+    return false;
+  }
+
+  bool _isJwtExpiringSoon(String token) {
+    try {
+      final parts = token.split('.');
+      if (parts.length != 3) return false;
+      final payload =
+          jsonDecode(utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))));
+      if (payload is Map && payload['exp'] is int) {
+        final expMs = (payload['exp'] as int) * 1000;
+        return DateTime.now().millisecondsSinceEpoch > (expMs - 90000);
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  /// Load stored token on app start (with automatic rotation if expiring)
   Future<void> loadStoredToken() async {
     try {
       final token = await storage.read(key: 'accessToken');
       final rt = await storage.read(key: 'refreshToken');
       final savedName = await storage.read(key: 'userName');
-      if (token != null && token.isNotEmpty) {
-        authToken.value = token;
-        _hydrateFromJwt(token);
-      }
       if (rt != null && rt.isNotEmpty) {
         refreshToken.value = rt;
       }
       if (savedName != null && savedName.isNotEmpty) {
         userName.value = savedName;
+      }
+      if (token != null && token.isNotEmpty) {
+        authToken.value = token;
+        _hydrateFromJwt(token);
+        if (_isJwtExpiringSoon(token) && refreshToken.value.isNotEmpty) {
+          await refreshAccessToken();
+        }
       }
     } catch (e) {
       debugPrint('Error loading token: $e');

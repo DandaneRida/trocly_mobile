@@ -43,6 +43,11 @@ class TroclyBottomNav extends StatelessWidget {
     }
   }
 
+  String _t(String key, String fallback) {
+    final v = key.tr;
+    return v == key ? fallback : v;
+  }
+
   @override
   Widget build(BuildContext context) {
     final chatCtrl = Get.isRegistered<ChatController>()
@@ -65,21 +70,21 @@ class TroclyBottomNav extends StatelessWidget {
               _PillNavItem(
                 icon: Icons.home_outlined,
                 activeIcon: Icons.home_rounded,
-                label: 'Accueil',
+                label: _t('nav_home', 'Accueil'),
                 isActive: currentIndex == 0,
                 onTap: () => _onTap(0),
               ),
               _PillNavItem(
                 icon: Icons.search_rounded,
                 activeIcon: Icons.search_rounded,
-                label: 'Explorer',
+                label: _t('nav_explore', 'Explorer'),
                 isActive: currentIndex == 1,
                 onTap: () => _onTap(1),
               ),
               _PillNavItem(
                 icon: Icons.add_circle_outline_rounded,
                 activeIcon: Icons.add_circle_rounded,
-                label: 'Publier',
+                label: _t('nav_publish', 'Publier'),
                 isActive: currentIndex == 2,
                 onTap: () => _onTap(2),
               ),
@@ -87,7 +92,7 @@ class TroclyBottomNav extends StatelessWidget {
                   ? Obx(() => _PillNavItem(
                         icon: Icons.chat_bubble_outline_rounded,
                         activeIcon: Icons.chat_bubble_rounded,
-                        label: 'Messages',
+                        label: _t('nav_messages', 'Messages'),
                         isActive: currentIndex == 3,
                         badgeCount: chatCtrl.unreadCount.value,
                         onTap: () => _onTap(3),
@@ -95,14 +100,14 @@ class TroclyBottomNav extends StatelessWidget {
                   : _PillNavItem(
                       icon: Icons.chat_bubble_outline_rounded,
                       activeIcon: Icons.chat_bubble_rounded,
-                      label: 'Messages',
+                      label: _t('nav_messages', 'Messages'),
                       isActive: currentIndex == 3,
                       onTap: () => _onTap(3),
                     ),
               _PillNavItem(
                 icon: Icons.person_outline_rounded,
                 activeIcon: Icons.person_rounded,
-                label: 'Profil',
+                label: _t('nav_profile', 'Profil'),
                 isActive: currentIndex == 4,
                 onTap: () => _onTap(4),
               ),

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:get/get.dart';
+import 'package:latlong2/latlong.dart';
 import '../../../../controllers/meeting_controller.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -7,6 +9,19 @@ import '../../../../core/widgets/primary_button.dart';
 import '../../../../core/widgets/trocly_bottom_nav.dart';
 import '../../../../core/widgets/trocly_brand_header.dart';
 
+class _SafeZoneSpot {
+  final String name;
+  final String city;
+  final LatLng coords;
+
+  const _SafeZoneSpot({
+    required this.name,
+    required this.city,
+    required this.coords,
+  });
+}
+
+/// Phase 2.2 — Proposer un rendez-vous avec carte interactive OpenStreetMap 100 % gratuite (Safe Zones)
 class ProposeMeetingScreen extends StatefulWidget {
   const ProposeMeetingScreen({Key? key}) : super(key: key);
 
@@ -17,21 +32,47 @@ class ProposeMeetingScreen extends StatefulWidget {
 class _ProposeMeetingScreenState extends State<ProposeMeetingScreen> {
   final MeetingController _meetingController = Get.find<MeetingController>();
   final _customPlaceController = TextEditingController();
+  final MapController _mapController = MapController();
 
   String? _offerId;
   String? _responderId;
   String _selectedPlace = 'Place El Hedim, Meknès';
+  LatLng _selectedCoords = const LatLng(33.8935, -5.5656);
   int _selectedHour = 15;
   int _selectedMinute = 0;
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
 
-  final List<String> _suggestedPlaces = const [
-    'Place El Hedim, Meknès',
-    'Gare Al Amir Abdelkader, Meknès',
-    'Marjane Meknès',
-    'Bab Boujloud, Fès',
-    'Gare Rabat Agdal',
-    'Gare Casa Voyageurs',
+  final List<_SafeZoneSpot> _safeZones = const [
+    _SafeZoneSpot(
+      name: 'Place El Hedim, Meknès',
+      city: 'Meknès',
+      coords: LatLng(33.8935, -5.5656),
+    ),
+    _SafeZoneSpot(
+      name: 'Gare Al Amir Abdelkader, Meknès',
+      city: 'Meknès',
+      coords: LatLng(33.8979, -5.5319),
+    ),
+    _SafeZoneSpot(
+      name: 'Campus ENSAM Meknès (Marjane)',
+      city: 'Meknès',
+      coords: LatLng(33.8581, -5.5702),
+    ),
+    _SafeZoneSpot(
+      name: 'Bab Boujloud, Fès',
+      city: 'Fès',
+      coords: LatLng(34.0617, -4.9846),
+    ),
+    _SafeZoneSpot(
+      name: 'Gare Rabat Agdal',
+      city: 'Rabat',
+      coords: LatLng(34.0018, -6.8562),
+    ),
+    _SafeZoneSpot(
+      name: 'Gare Casa Voyageurs',
+      city: 'Casablanca',
+      coords: LatLng(33.5898, -7.5908),
+    ),
   ];
 
   final List<List<int>> _slots = const [
@@ -70,6 +111,17 @@ class _ProposeMeetingScreenState extends State<ProposeMeetingScreen> {
         _selectedHour,
         _selectedMinute,
       );
+
+  void _selectSafeZone(_SafeZoneSpot spot) {
+    setState(() {
+      _selectedPlace = spot.name;
+      _selectedCoords = spot.coords;
+      _customPlaceController.clear();
+    });
+    try {
+      _mapController.move(spot.coords, 14.5);
+    } catch (_) {}
+  }
 
   Future<void> _submit() async {
     if (_offerId == null || _offerId!.isEmpty) {
@@ -113,54 +165,121 @@ class _ProposeMeetingScreenState extends State<ProposeMeetingScreen> {
         children: [
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Un lieu public et un créneau', style: AppTypography.serif(size: 24)),
-                  const SizedBox(height: 6),
+                  Text('Choisissez une Safe Zone',
+                      style: AppTypography.serif(size: 23)),
+                  const SizedBox(height: 5),
                   Text(
-                    'Une fois accepté par votre partenaire, vos deux codes QR seront générés. Le rendez-vous expire automatiquement 2 heures après le créneau.',
+                    'Privilégiez un lieu public fréquenté. Touchez un repère sur la carte OpenStreetMap ou une pastille ci-dessous.',
                     style: AppTypography.sans(
                       size: 13,
                       color: AppColors.textSecondary,
-                      height: 1.5,
+                      height: 1.45,
                     ),
                   ),
-                  const SizedBox(height: 22),
+                  const SizedBox(height: 14),
 
-                  Text('LIEUX PUBLICS SUGGÉRÉS', style: AppTypography.eyebrow()),
+                  // Carte interactive OpenStreetMap 100 % gratuite
+                  Container(
+                    height: 185,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(22),
+                      boxShadow: AppColors.cardShadow,
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(22),
+                      child: FlutterMap(
+                        mapController: _mapController,
+                        options: MapOptions(
+                          initialCenter: _selectedCoords,
+                          initialZoom: 13.8,
+                        ),
+                        children: [
+                          TileLayer(
+                            urlTemplate:
+                                'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                            userAgentPackageName: 'com.ensam.trocly',
+                          ),
+                          MarkerLayer(
+                            markers: _safeZones.map((spot) {
+                              final selected = spot.name == _selectedPlace;
+                              return Marker(
+                                point: spot.coords,
+                                width: selected ? 44 : 36,
+                                height: selected ? 44 : 36,
+                                child: GestureDetector(
+                                  onTap: () => _selectSafeZone(spot),
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: selected
+                                          ? AppColors.accent
+                                          : AppColors.surface,
+                                      shape: BoxShape.circle,
+                                      boxShadow: AppColors.pillShadow,
+                                      border: Border.all(
+                                        color: AppColors.accent,
+                                        width: 2,
+                                      ),
+                                    ),
+                                    child: Icon(
+                                      Icons.shield_outlined,
+                                      size: selected ? 22 : 18,
+                                      color: selected
+                                          ? Colors.white
+                                          : AppColors.accent,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  Text('SAFE ZONES VÉRIFIÉES', style: AppTypography.eyebrow()),
                   const SizedBox(height: 10),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
-                    children: _suggestedPlaces.map((place) {
-                      final active = _selectedPlace == place &&
+                    children: _safeZones.map((spot) {
+                      final active = _selectedPlace == spot.name &&
                           _customPlaceController.text.trim().isEmpty;
-                      return InkWell(
-                        onTap: () {
-                          setState(() {
-                            _selectedPlace = place;
-                            _customPlaceController.clear();
-                          });
-                        },
-                        borderRadius: BorderRadius.circular(8),
+                      return GestureDetector(
+                        onTap: () => _selectSafeZone(spot),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 13, vertical: 8),
                           decoration: BoxDecoration(
-                            color: active ? AppColors.ink : AppColors.surface,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: active ? AppColors.ink : AppColors.line,
-                            ),
+                            color: active ? AppColors.accent : AppColors.surface,
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: active
+                                ? AppColors.coralShadow
+                                : AppColors.pillShadow,
                           ),
-                          child: Text(
-                            place,
-                            style: AppTypography.sans(
-                              size: 12.5,
-                              weight: active ? FontWeight.w600 : FontWeight.w400,
-                              color: active ? Colors.white : AppColors.ink,
-                            ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.verified_user_outlined,
+                                size: 14,
+                                color: active ? Colors.white : AppColors.accent,
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                spot.name,
+                                style: AppTypography.sans(
+                                  size: 12,
+                                  weight: FontWeight.w600,
+                                  color: active ? Colors.white : AppColors.ink,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       );
@@ -171,13 +290,15 @@ class _ProposeMeetingScreenState extends State<ProposeMeetingScreen> {
                     controller: _customPlaceController,
                     onChanged: (_) => setState(() {}),
                     decoration: const InputDecoration(
-                      hintText: 'Ou saisir un autre lieu public (café, place, gare…)',
+                      hintText: 'Ou précisez un autre lieu public (café, gare…)',
+                      prefixIcon: Icon(Icons.edit_location_alt_outlined,
+                          size: 19, color: AppColors.textSecondary),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 22),
 
-                  Text('DATE', style: AppTypography.eyebrow()),
-                  const SizedBox(height: 8),
+                  Text('DATE DU RENDEZ-VOUS', style: AppTypography.eyebrow()),
+                  const SizedBox(height: 10),
                   InkWell(
                     onTap: () async {
                       final picked = await showDatePicker(
@@ -190,59 +311,74 @@ class _ProposeMeetingScreenState extends State<ProposeMeetingScreen> {
                         setState(() => _selectedDate = picked);
                       }
                     },
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(18),
                     child: Container(
-                      height: 48,
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 14),
                       decoration: BoxDecoration(
                         color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: AppColors.line),
+                        borderRadius: BorderRadius.circular(18),
+                        boxShadow: AppColors.cardShadow,
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            '${_selectedDate.day.toString().padLeft(2, '0')}/${_selectedDate.month.toString().padLeft(2, '0')}/${_selectedDate.year}',
-                            style: AppTypography.sans(size: 14, weight: FontWeight.w500),
+                          Row(
+                            children: [
+                              const Icon(Icons.calendar_today_rounded,
+                                  size: 18, color: AppColors.accent),
+                              const SizedBox(width: 10),
+                              Text(
+                                '${_selectedDate.day.toString().padLeft(2, '0')}/${_selectedDate.month.toString().padLeft(2, '0')}/${_selectedDate.year}',
+                                style: AppTypography.sans(
+                                    size: 14.5, weight: FontWeight.w700),
+                              ),
+                            ],
                           ),
-                          const Icon(Icons.calendar_today_outlined,
-                              size: 18, color: AppColors.textSecondary),
+                          Text(
+                            'Modifier',
+                            style: AppTypography.sans(
+                              size: 12.5,
+                              weight: FontWeight.w700,
+                              color: AppColors.accent,
+                            ),
+                          ),
                         ],
                       ),
                     ),
                   ),
-                  const SizedBox(height: 22),
+                  const SizedBox(height: 20),
 
-                  Text('CRÉNEAU', style: AppTypography.eyebrow()),
+                  Text('CRÉNEAU HORAIRE', style: AppTypography.eyebrow()),
                   const SizedBox(height: 10),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
                     children: _slots.map((s) {
-                      final active = _selectedHour == s[0] && _selectedMinute == s[1];
-                      return InkWell(
+                      final active =
+                          _selectedHour == s[0] && _selectedMinute == s[1];
+                      return GestureDetector(
                         onTap: () {
                           setState(() {
                             _selectedHour = s[0];
                             _selectedMinute = s[1];
                           });
                         },
-                        borderRadius: BorderRadius.circular(8),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 10),
                           decoration: BoxDecoration(
-                            color: active ? AppColors.ink : AppColors.surface,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: active ? AppColors.ink : AppColors.line,
-                            ),
+                            color: active ? AppColors.accent : AppColors.surface,
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: active
+                                ? AppColors.coralShadow
+                                : AppColors.pillShadow,
                           ),
                           child: Text(
                             _formatSlot(s[0], s[1]),
                             style: AppTypography.sans(
                               size: 13,
-                              weight: active ? FontWeight.w600 : FontWeight.w400,
+                              weight: FontWeight.w700,
                               color: active ? Colors.white : AppColors.ink,
                             ),
                           ),
@@ -250,22 +386,27 @@ class _ProposeMeetingScreenState extends State<ProposeMeetingScreen> {
                       );
                     }).toList(),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 18),
 
                   Container(
-                    padding: const EdgeInsets.all(13),
+                    padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
                       color: AppColors.accentLight,
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(16),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.schedule_rounded, size: 17, color: AppColors.accent),
+                        const Icon(Icons.timer_outlined,
+                            size: 18, color: AppColors.accent),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            'Expiration automatique à ${_formatSlot(expires.hour, expires.minute)} si le double scan n\'est pas effectué.',
-                            style: AppTypography.sans(size: 12.5, color: AppColors.ink),
+                            'Expiration automatique à ${_formatSlot(expires.hour, expires.minute)} (+2h après le créneau).',
+                            style: AppTypography.sans(
+                              size: 12.5,
+                              weight: FontWeight.w600,
+                              color: AppColors.accent,
+                            ),
                           ),
                         ),
                       ],
@@ -281,13 +422,13 @@ class _ProposeMeetingScreenState extends State<ProposeMeetingScreen> {
               border: Border(top: BorderSide(color: AppColors.line)),
             ),
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-            child: SafeArea(
-              top: false,
-              child: Obx(() => PrimaryButton(
-                    label: 'Envoyer la proposition de RDV',
-                    isLoading: _meetingController.isLoading.value,
-                    onPressed: _submit,
-                  )),
+            child: Obx(
+              () => PrimaryButton(
+                label: 'Envoyer l\'invitation de RDV',
+                icon: Icons.send_rounded,
+                isLoading: _meetingController.isLoading.value,
+                onPressed: _submit,
+              ),
             ),
           ),
         ],

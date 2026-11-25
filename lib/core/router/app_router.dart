@@ -18,6 +18,8 @@ import '../../features/meeting/presentation/screens/scan_qr_screen.dart';
 import '../../features/meeting/presentation/screens/review_screen.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../../features/profile/presentation/screens/report_screen.dart';
+import '../../features/profile/presentation/screens/favorites_screen.dart';
+import '../../features/profile/presentation/screens/admin_moderation_screen.dart';
 
 class AppRouter {
   static const String splash = '/';
@@ -44,6 +46,8 @@ class AppRouter {
 
   static const String profile = '/profile';
   static const String report = '/report';
+  static const String favorites = '/favorites';
+  static const String admin = '/admin';
 
   static final List<GetPage> routes = [
     GetPage(name: splash, page: () => const SplashScreen()),
@@ -70,5 +74,7 @@ class AppRouter {
 
     GetPage(name: profile, page: () => const ProfileScreen()),
     GetPage(name: report, page: () => const ReportScreen()),
+    GetPage(name: favorites, page: () => const FavoritesScreen()),
+    GetPage(name: admin, page: () => const AdminModerationScreen()),
   ];
 }

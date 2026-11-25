@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "757080878174",
+    "project_id": "trocly-35030",
+    "storage_bucket": "trocly-35030.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:757080878174:android:c182f3c7e305eae61b18cf",
+        "android_client_info": {
+          "package_name": "com.ensam.trocly"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "REPLACE_WITH_FIREBASE_ANDROID_API_KEY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

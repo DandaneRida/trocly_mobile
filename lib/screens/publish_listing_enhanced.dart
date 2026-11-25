@@ -205,14 +205,6 @@ class _PublishListingScreenEnhancedState
 
   @override
   Widget build(BuildContext context) {
-    final cityMap = {
-      'Meknès': 1,
-      'Fès': 2,
-      'Rabat': 3,
-      'Casablanca': 4,
-      'Marrakech': 5,
-    };
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Publish Listing'),

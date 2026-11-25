@@ -5,7 +5,6 @@ import 'package:http_parser/http_parser.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:convert';
 import 'auth_controller.dart';
-import 'offers_controller.dart';
 import '../core/constants/api_constants.dart';
 
 String get apiUrl => ApiConstants.baseUrl;
@@ -40,6 +39,8 @@ class ListingModel {
   String userId;
   String? userName;
   Map<String, dynamic> attributes;
+  int? matchScore;
+  String? matchReason;
 
   ListingModel({
     required this.id,
@@ -55,6 +56,8 @@ class ListingModel {
     required this.userId,
     this.userName,
     this.attributes = const {},
+    this.matchScore,
+    this.matchReason,
   });
 
   List<String> get wishes {
@@ -97,6 +100,8 @@ class ListingModel {
       userId: json['user']?['id']?.toString() ?? '',
       userName: json['user']?['displayName'],
       attributes: parsedAttrs,
+      matchScore: json['matchScore'] is int ? json['matchScore'] : null,
+      matchReason: json['matchReason']?.toString(),
     );
   }
 }
@@ -104,8 +109,12 @@ class ListingModel {
 class ListingsController extends GetxController {
   var listings = <ListingModel>[].obs;
   var myListings = <ListingModel>[].obs;
+  var smartMatches = <ListingModel>[].obs;
   var isLoading = false.obs;
+  var isLoadingMore = false.obs;
   var isMyListingsLoading = false.obs;
+  var currentPage = 1.obs;
+  var hasMore = true.obs;
 
   var selectedCity = 'Meknès'.obs;
   var selectedCityId = Rxn<int>(1);
@@ -280,7 +289,15 @@ class ListingsController extends GetxController {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final listingsData = (data['listings'] as List?) ?? [];
-        listings.value = listingsData.map((l) => ListingModel.fromJson(l)).toList();
+        final parsed = listingsData.map((l) => ListingModel.fromJson(l)).toList();
+        if (page == 1) {
+          listings.value = parsed;
+        } else {
+          final existingIds = listings.map((e) => e.id).toSet();
+          listings.addAll(parsed.where((p) => !existingIds.contains(p.id)));
+        }
+        currentPage.value = page;
+        hasMore.value = parsed.length >= limit;
       } else {
         errorMessage.value = 'Échec du chargement des annonces';
       }
@@ -288,6 +305,38 @@ class ListingsController extends GetxController {
       errorMessage.value = 'Erreur réseau: $e';
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  /// Phase 3.2 - Pagination infinie
+  Future<void> fetchMoreListings() async {
+    if (isLoading.value || isLoadingMore.value || !hasMore.value) return;
+    isLoadingMore.value = true;
+    try {
+      await fetchListings(page: currentPage.value + 1, limit: 20);
+    } finally {
+      isLoadingMore.value = false;
+    }
+  }
+
+  /// Phase 2.1 - Smart Matching (« Double Coïncidence des Besoins »)
+  Future<void> fetchSmartMatches() async {
+    final auth = Get.find<AuthController>();
+    if (auth.authToken.value.isEmpty) {
+      smartMatches.clear();
+      return;
+    }
+    try {
+      final resp = await client.get(
+        Uri.parse('$apiUrl/listings/matches?limit=8'),
+        headers: _getAuthHeaders(),
+      );
+      if (resp.statusCode == 200) {
+        final List data = jsonDecode(resp.body);
+        smartMatches.value = data.map((e) => ListingModel.fromJson(e)).toList();
+      }
+    } catch (e) {
+      debugPrint('fetchSmartMatches warning: $e');
     }
   }
 

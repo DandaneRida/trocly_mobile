@@ -239,11 +239,12 @@ class OffersController extends GetxController {
     }
   }
 
-  /// C2 - Counter-offer
+  /// C2 - Counter-offer (supports soultePossible toggle, zero fixed price)
   Future<OfferModel?> createCounterOffer({
     required String originalOfferId,
     required List<String> counterListingIds,
     double? counterSoulte,
+    bool soultePossible = false,
     String? message,
   }) async {
     isLoading.value = true;
@@ -253,6 +254,7 @@ class OffersController extends GetxController {
         headers: _headers(),
         body: jsonEncode({
           'counterListingIds': counterListingIds,
+          'soultePossible': soultePossible,
           if (counterSoulte != null && counterSoulte > 0)
             'counterSoulte': counterSoulte,
           if (message != null && message.isNotEmpty) 'message': message,

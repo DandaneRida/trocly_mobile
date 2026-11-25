@@ -1,14 +1,23 @@
 import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, kReleaseMode;
 
 class ApiConstants {
+  static const String liveCloudUrl =
+      'https://teriyaki-functional-whale.abasthan.app';
+  static const String _envApiUrl = String.fromEnvironment('API_URL');
+
   static String get baseUrl {
+    if (_envApiUrl.isNotEmpty) {
+      return _envApiUrl;
+    }
+    if (kReleaseMode) {
+      return liveCloudUrl;
+    }
     if (kIsWeb) {
       return 'http://localhost:3000';
     }
     try {
       if (Platform.isAndroid) {
-        // 10.0.2.2 is the special alias to host localhost in Android emulator
         return 'http://10.0.2.2:3000';
       }
     } catch (_) {}
@@ -16,14 +25,10 @@ class ApiConstants {
   }
 
   static String get wsUrl {
-    if (kIsWeb) {
-      return 'ws://localhost:3000';
+    final base = baseUrl;
+    if (base.startsWith('https://')) {
+      return base.replaceFirst('https://', 'wss://');
     }
-    try {
-      if (Platform.isAndroid) {
-        return 'ws://10.0.2.2:3000';
-      }
-    } catch (_) {}
-    return 'ws://localhost:3000';
+    return base.replaceFirst('http://', 'ws://');
   }
 }

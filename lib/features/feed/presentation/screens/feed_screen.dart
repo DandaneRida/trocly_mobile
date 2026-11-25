@@ -6,6 +6,7 @@ import '../../../../controllers/notifications_controller.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/listing_card.dart';
+import '../../../../core/widgets/skeleton_loader.dart';
 import '../../../../core/widgets/state_page.dart';
 import '../../../../core/widgets/trocly_bottom_nav.dart';
 import '../../../../core/widgets/trocly_brand_header.dart';
@@ -40,6 +41,7 @@ class _FeedScreenState extends State<FeedScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _listingsController.fetchCities();
       _listingsController.fetchListings();
+      _listingsController.fetchSmartMatches();
       _notifController.fetchUnreadCount();
     });
   }
@@ -164,10 +166,21 @@ class _FeedScreenState extends State<FeedScreen> {
       backgroundColor: AppColors.paper,
       bottomNavigationBar: const TroclyBottomNav(currentIndex: 0),
       body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: () => _listingsController.fetchListings(),
-          color: AppColors.accent,
-          child: CustomScrollView(
+        child: NotificationListener<ScrollNotification>(
+          onNotification: (scrollInfo) {
+            if (scrollInfo.metrics.pixels >=
+                scrollInfo.metrics.maxScrollExtent - 240) {
+              _listingsController.fetchMoreListings();
+            }
+            return false;
+          },
+          child: RefreshIndicator(
+            onRefresh: () async {
+              await _listingsController.fetchListings();
+              await _listingsController.fetchSmartMatches();
+            },
+            color: AppColors.accent,
+            child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
               // Top header + pill search + hero banner
@@ -205,7 +218,7 @@ class _FeedScreenState extends State<FeedScreen> {
                                       ),
                                       alignment: Alignment.center,
                                       child: Text(
-                                        'Connexion',
+                                        'login_btn'.tr,
                                         style: AppTypography.sans(
                                           size: 13,
                                           weight: FontWeight.w700,
@@ -260,7 +273,7 @@ class _FeedScreenState extends State<FeedScreen> {
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Text(
-                                  'Vêtements, vélo, console…',
+                                  'search_hint'.tr,
                                   style: AppTypography.sans(
                                     size: 13.5,
                                     color: AppColors.textHint,
@@ -352,7 +365,7 @@ class _FeedScreenState extends State<FeedScreen> {
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
                                           Text(
-                                            'Échangez malin,\nzéro frais !',
+                                            'hero_title'.tr,
                                             style: AppTypography.serif(
                                               size: 18,
                                               color: Colors.white,
@@ -361,7 +374,7 @@ class _FeedScreenState extends State<FeedScreen> {
                                           ),
                                           const SizedBox(height: 4),
                                           Text(
-                                            'Troc sécurisé par double QR',
+                                            'hero_sub'.tr,
                                             style: AppTypography.sans(
                                               size: 11.5,
                                               color: Colors.white.withValues(alpha: 0.9),
@@ -385,7 +398,7 @@ class _FeedScreenState extends State<FeedScreen> {
                                             borderRadius: BorderRadius.circular(20),
                                           ),
                                           child: Text(
-                                            'Publier un objet',
+                                            'publish_item'.tr,
                                             style: AppTypography.sans(
                                               size: 11.5,
                                               weight: FontWeight.w700,
@@ -465,15 +478,139 @@ class _FeedScreenState extends State<FeedScreen> {
                 ),
               ),
 
+              // Phase 2.1: Smart Matching horizontal carousel (« Double Coïncidence »)
+              Obx(() {
+                final matches = _listingsController.smartMatches;
+                if (matches.isEmpty) {
+                  return const SliverToBoxAdapter(child: SizedBox.shrink());
+                }
+                return SliverToBoxAdapter(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.auto_awesome_rounded,
+                                size: 18, color: AppColors.accent),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                'smart_matches'.tr,
+                                style: AppTypography.serif(size: 17),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(
+                        height: 158,
+                        child: ListView.separated(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          scrollDirection: Axis.horizontal,
+                          itemCount: matches.length,
+                          separatorBuilder: (_, __) => const SizedBox(width: 12),
+                          itemBuilder: (_, idx) {
+                            final m = matches[idx];
+                            return GestureDetector(
+                              onTap: () =>
+                                  Get.toNamed('/listing/${m.id}', arguments: m),
+                              child: Container(
+                                width: 250,
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: AppColors.surface,
+                                  borderRadius: BorderRadius.circular(20),
+                                  boxShadow: AppColors.cardShadow,
+                                ),
+                                child: Row(
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(14),
+                                      child: Container(
+                                        width: 82,
+                                        height: double.infinity,
+                                        color: AppColors.imagePlaceholder,
+                                        child: m.photos.isNotEmpty
+                                            ? Image.network(m.photos.first,
+                                                fit: BoxFit.cover,
+                                                errorBuilder: (_, __, ___) =>
+                                                    const Icon(
+                                                        Icons.photo_outlined))
+                                            : const Icon(Icons.photo_outlined),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 11),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 8, vertical: 3),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.accentLight,
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
+                                            ),
+                                            child: Text(
+                                              '${m.matchScore ?? 85}% match',
+                                              style: AppTypography.sans(
+                                                size: 10.5,
+                                                weight: FontWeight.w700,
+                                                color: AppColors.accent,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            m.title,
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: AppTypography.sans(
+                                                size: 13,
+                                                weight: FontWeight.w700),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            m.matchReason ?? m.city,
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: AppTypography.sans(
+                                              size: 11,
+                                              color: AppColors.textSecondary,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+
               // Titre de section
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
+                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Nouveautés près de vous',
-                          style: AppTypography.serif(size: 19)),
+                      Flexible(
+                        child: Text('recent_nearby'.tr,
+                            style: AppTypography.serif(size: 19)),
+                      ),
                       Obx(() {
                         final n = _listingsController.listings.length;
                         return Container(
@@ -498,15 +635,12 @@ class _FeedScreenState extends State<FeedScreen> {
                 ),
               ),
 
-              // Grille d'annonces / états vides
+              // Grille d'annonces / Skeletons (Phase 1.4) / états vides
               Obx(() {
-                if (_listingsController.isLoading.value) {
-                  return const SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: Center(
-                      child: CircularProgressIndicator(
-                          color: AppColors.accent, strokeWidth: 2.5),
-                    ),
+                if (_listingsController.isLoading.value &&
+                    _listingsController.listings.isEmpty) {
+                  return const SliverToBoxAdapter(
+                    child: ListingGridSkeleton(count: 4),
                   );
                 }
 
@@ -540,6 +674,7 @@ class _FeedScreenState extends State<FeedScreen> {
                           cityName: item.city,
                           photoUrl: item.photos.isNotEmpty ? item.photos.first : null,
                           wishLabel: item.wishSummary,
+                          listingModel: item,
                           onTap: () => Get.toNamed('/listing/${item.id}', arguments: item),
                         );
                       },
@@ -550,6 +685,7 @@ class _FeedScreenState extends State<FeedScreen> {
               }),
             ],
           ),
+        ),
         ),
       ),
     );
