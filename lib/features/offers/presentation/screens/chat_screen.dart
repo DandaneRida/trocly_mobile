@@ -232,7 +232,11 @@ class _ChatScreenState extends State<ChatScreen> {
                 Text(
                   _itemSummary.isNotEmpty
                       ? _itemSummary
-                      : 'Échange en cours de négociation',
+                      : status == 'cancelled'
+                          ? 'Annonce supprimée · Échange annulé'
+                          : status == 'rejected'
+                              ? 'Proposition déclinée'
+                              : 'Échange en cours de négociation',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: AppTypography.sans(size: 13.5, weight: FontWeight.w600),
@@ -257,20 +261,29 @@ class _ChatScreenState extends State<ChatScreen> {
                 else if (status == 'rejected' || status == 'cancelled')
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
                     decoration: BoxDecoration(
                       color: AppColors.errorLight,
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    child: Text(
-                      status == 'rejected'
-                          ? 'Cette proposition d\'échange a été refusée.'
-                          : 'Cette proposition d\'échange a été annulée.',
-                      style: AppTypography.sans(
-                        size: 12,
-                        weight: FontWeight.w500,
-                        color: AppColors.error,
-                      ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.event_busy_rounded,
+                            size: 16, color: AppColors.error),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            status == 'rejected'
+                                ? 'Cette proposition d\'échange a été refusée.'
+                                : 'Une annonce de cet échange a été supprimée — impossible de planifier un rendez-vous.',
+                            style: AppTypography.sans(
+                              size: 12,
+                              weight: FontWeight.w600,
+                              color: AppColors.error,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   )
                 else if (_isResponder)
