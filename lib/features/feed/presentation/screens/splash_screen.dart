@@ -15,18 +15,15 @@ class SplashScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.paper,
       body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            SliverFillRemaining(
-              hasScrollBody: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(22, 20, 22, 24),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 460),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(22, 18, 22, 24),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 460),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -151,14 +148,13 @@ class SplashScreen extends StatelessWidget {
                           subtitle: 'Double scan QR sur place et avis mutuels',
                         ),
 
-                        const Spacer(),
                         const SizedBox(height: 22),
                         PrimaryButton(
                           label: 'Explorer les annonces',
                           icon: Icons.arrow_forward_rounded,
                           onPressed: () => Get.offNamed('/feed'),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 6),
                         Obx(() {
                           if (auth.authToken.value.isNotEmpty) {
                             return const SizedBox.shrink();
@@ -177,13 +173,10 @@ class SplashScreen extends StatelessWidget {
                             ),
                           );
                         }),
-                      ],
-                    ),
-                  ),
-                ),
+                ],
               ),
             ),
-          ],
+          ),
         ),
       ),
     );
