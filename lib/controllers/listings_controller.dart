@@ -434,6 +434,67 @@ class ListingsController extends GetxController {
     }
   }
 
+  /// Story B3 - Modifier une annonce (titre, description, photos, catégorie, état, ville, souhaits)
+  Future<bool> updateListing({
+    required String listingId,
+    required String title,
+    required String description,
+    required String category,
+    required String condition,
+    required String city,
+    required List<String> photos,
+    required Map<String, dynamic> attributes,
+    required List<String> wishes,
+  }) async {
+    isLoading.value = true;
+    errorMessage.value = '';
+    try {
+      int cityId = 1;
+      final found = cities.firstWhereOrNull((c) => c.name == city);
+      if (found != null) {
+        cityId = found.id;
+      }
+
+      final combinedAttributes = Map<String, dynamic>.from(attributes);
+      if (wishes.isNotEmpty) {
+        combinedAttributes['wishes'] = wishes;
+      }
+
+      final headers = _getAuthHeaders();
+      final response = await client.patch(
+        Uri.parse('$apiUrl/listings/$listingId'),
+        headers: headers,
+        body: jsonEncode({
+          'title': title,
+          'description': description,
+          'category': category,
+          'condition': condition,
+          'cityId': cityId,
+          'photos': photos,
+          'attributes': combinedAttributes,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        await fetchListings();
+        await fetchMyListings();
+        return true;
+      } else {
+        final err = jsonDecode(response.body);
+        errorMessage.value =
+            err['message']?.toString() ?? 'Modification impossible';
+        Get.snackbar('Erreur', errorMessage.value);
+        return false;
+      }
+    } catch (e) {
+      errorMessage.value = e.toString();
+      Get.snackbar('Erreur réseau', e.toString());
+      return false;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
   /// Story B3 - Supprimer une annonce
   Future<bool> deleteListing(String listingId) async {
     try {

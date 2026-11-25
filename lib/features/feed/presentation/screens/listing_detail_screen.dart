@@ -455,11 +455,25 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
                   item.userId.isNotEmpty &&
                   item.userId == _authController.userId.value;
               if (isOwner) {
-                return PrimaryButton(
-                  label: 'Gérer mon annonce',
-                  icon: Icons.edit_outlined,
-                  isOutlined: true,
-                  onPressed: () => Get.toNamed('/my-listings'),
+                return Row(
+                  children: [
+                    SizedBox(
+                      width: 132,
+                      child: PrimaryButton(
+                        label: 'Mes annonces',
+                        isOutlined: true,
+                        onPressed: () => Get.toNamed('/my-listings'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: PrimaryButton(
+                        label: 'Modifier l\'annonce',
+                        icon: Icons.edit_outlined,
+                        onPressed: () => Get.toNamed('/publish', arguments: item),
+                      ),
+                    ),
+                  ],
                 );
               }
               return Row(

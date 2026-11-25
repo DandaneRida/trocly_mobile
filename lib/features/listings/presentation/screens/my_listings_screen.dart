@@ -28,7 +28,10 @@ class _MyListingsScreenState extends State<MyListingsScreen>
     if (Get.arguments is Map && (Get.arguments as Map)['justPublished'] == true) {
       final args = Get.arguments as Map;
       final city = args['city'] ?? 'votre ville';
-      _publishedBannerText = 'Annonce publiée ! Visible à $city.';
+      final isEdited = args['isEdited'] == true;
+      _publishedBannerText = isEdited
+          ? 'Annonce mise à jour avec succès !'
+          : 'Annonce publiée ! Visible à $city.';
     }
     _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(() {
@@ -257,7 +260,10 @@ class _MyListingsScreenState extends State<MyListingsScreen>
                       icon: const Icon(Icons.more_horiz_rounded, color: AppColors.textSecondary),
                       color: AppColors.surface,
                       onSelected: (val) async {
-                        if (val == 'archive') {
+                        if (val == 'edit') {
+                          await Get.toNamed('/publish', arguments: item);
+                          _listingsController.fetchMyListings(status: statusFilter);
+                        } else if (val == 'archive') {
                           final ok = await _listingsController.changeListingStatus(item.id, 'archived');
                           if (ok) _listingsController.fetchMyListings(status: statusFilter);
                         } else if (val == 'reactivate') {
@@ -294,6 +300,8 @@ class _MyListingsScreenState extends State<MyListingsScreen>
                         }
                       },
                       itemBuilder: (context) => [
+                        if (item.status != 'exchanged')
+                          const PopupMenuItem(value: 'edit', child: Text('Modifier (photos, texte…)')),
                         if (item.status == 'active')
                           const PopupMenuItem(value: 'archive', child: Text('Archiver')),
                         if (item.status == 'archived')

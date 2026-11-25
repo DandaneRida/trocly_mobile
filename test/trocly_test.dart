@@ -9,6 +9,7 @@ import 'package:trocly_mobile/controllers/offers_controller.dart';
 import 'package:trocly_mobile/core/widgets/state_page.dart';
 import 'package:trocly_mobile/features/feed/presentation/screens/listing_detail_screen.dart';
 import 'package:trocly_mobile/features/feed/presentation/screens/splash_screen.dart';
+import 'package:trocly_mobile/features/listings/presentation/screens/create_listing_screen.dart';
 import 'package:trocly_mobile/features/meeting/presentation/screens/qr_screen.dart';
 import 'package:trocly_mobile/features/offers/presentation/screens/chat_screen.dart';
 import 'package:trocly_mobile/features/offers/presentation/screens/messages_inbox_screen.dart';
@@ -113,7 +114,8 @@ void main() {
       Get.toNamed('/detail', arguments: ownListing);
       await tester.pumpAndSettle();
 
-      expect(find.text('Gérer mon annonce'), findsOneWidget);
+      expect(find.text('Modifier l\'annonce'), findsOneWidget);
+      expect(find.text('Mes annonces'), findsOneWidget);
       expect(find.text('Proposer un troc'), findsNothing);
     });
 
@@ -257,6 +259,54 @@ void main() {
 
       expect(tester.takeException(), isNull);
       expect(find.text('Explorer les annonces'), findsOneWidget);
+    });
+
+    testWidgets('CreateListingScreen pre-fills title, description, wishes in edit mode',
+        (WidgetTester tester) async {
+      Get.put(AuthController());
+      Get.put(ListingsController());
+
+      final existing = ListingModel(
+        id: 'l-edit',
+        title: 'Veste en cuir',
+        description: 'Taille M très propre',
+        category: 'Vêtements',
+        condition: 'tres_bon',
+        estimatedValue: 0,
+        city: 'Meknès',
+        photos: const [],
+        status: 'active',
+        userId: 'u-1',
+        attributes: const {
+          'wishes': ['Casque audio'],
+        },
+      );
+
+      await tester.pumpWidget(GetMaterialApp(
+        home: const SizedBox.shrink(),
+        getPages: [
+          GetPage(name: '/publish', page: () => const CreateListingScreen()),
+        ],
+      ));
+
+      Get.toNamed('/publish', arguments: existing);
+      await tester.pumpAndSettle();
+
+      // Step 1 -> Step 2 (title)
+      await tester.tap(find.text('Continuer'));
+      await tester.pumpAndSettle();
+      expect(find.text('Veste en cuir'), findsOneWidget);
+
+      // Step 2 -> Step 3 (description + wish)
+      await tester.tap(find.text('Continuer'));
+      await tester.pumpAndSettle();
+      expect(find.text('Taille M très propre'), findsOneWidget);
+      expect(find.text('Casque audio'), findsOneWidget);
+
+      // Step 3 -> Step 4 (save button label)
+      await tester.tap(find.text('Continuer'));
+      await tester.pumpAndSettle();
+      expect(find.text('Enregistrer les modifications'), findsOneWidget);
     });
   });
 }

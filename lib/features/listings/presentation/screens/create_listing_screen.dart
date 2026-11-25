@@ -26,10 +26,13 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
   final int _totalSteps = 4;
   bool _isPublishing = false;
   String? _duplicateError;
+  ListingModel? _editingListing;
 
-  // Photos
+  bool get _isEditing => _editingListing != null;
+
+  // Photos (parallel lists: _uploadedPhotoUrls has URL for every photo; _previewBytes has bytes or null for network photos)
   final List<String> _uploadedPhotoUrls = [];
-  final List<Uint8List> _previewBytes = [];
+  final List<Uint8List?> _previewBytes = [];
   bool _isUploadingPhoto = false;
 
   // Form controllers
@@ -86,6 +89,34 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
     _selectedCity = _authController.selectedCity.value.isNotEmpty
         ? _authController.selectedCity.value
         : _listingsController.selectedCity.value;
+
+    if (Get.arguments is ListingModel) {
+      final item = Get.arguments as ListingModel;
+      _editingListing = item;
+      _titleController.text = item.title;
+      _descController.text = item.description;
+      if (_categories.contains(item.category)) {
+        _selectedCategory = item.category;
+      }
+      if (_conditionOptions.any((c) => c['key'] == item.condition)) {
+        _selectedCondition = item.condition;
+      }
+      if (item.city.isNotEmpty) {
+        _selectedCity = item.city;
+      }
+      final brand = item.attributes['marque']?.toString() ?? '';
+      _brandController.text = brand;
+      if (item.wishes.isNotEmpty &&
+          item.wishSummary.toLowerCase() != 'échange ouvert' &&
+          item.wishSummary.toLowerCase() != 'ouvert aux propositions') {
+        _wishController.text = item.wishes.join(', ');
+      }
+      for (final url in item.photos) {
+        _uploadedPhotoUrls.add(url);
+        _previewBytes.add(null);
+      }
+    }
+
     if (_listingsController.cities.isEmpty) {
       _listingsController.fetchCities();
     }
@@ -191,32 +222,53 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
         attrs['marque'] = _brandController.text.trim();
       }
 
-      final success = await _listingsController.publishListingEnhanced(
-        title: _titleController.text.trim(),
-        description: _descController.text.trim(),
-        category: _selectedCategory,
-        condition: _selectedCondition,
-        estimatedValue: 0.0,
-        city: _selectedCity,
-        photos: _uploadedPhotoUrls,
-        attributes: attrs,
-        wishes: _wishController.text.trim().isNotEmpty
-            ? _wishController.text
-                .split(',')
-                .map((s) => s.trim())
-                .where((s) => s.isNotEmpty)
-                .toList()
-            : ['Ouvert aux propositions'],
-      );
+      final success = _isEditing
+          ? await _listingsController.updateListing(
+              listingId: _editingListing!.id,
+              title: _titleController.text.trim(),
+              description: _descController.text.trim(),
+              category: _selectedCategory,
+              condition: _selectedCondition,
+              city: _selectedCity,
+              photos: _uploadedPhotoUrls,
+              attributes: attrs,
+              wishes: _wishController.text.trim().isNotEmpty
+                  ? _wishController.text
+                      .split(',')
+                      .map((s) => s.trim())
+                      .where((s) => s.isNotEmpty)
+                      .toList()
+                  : ['Ouvert aux propositions'],
+            )
+          : await _listingsController.publishListingEnhanced(
+              title: _titleController.text.trim(),
+              description: _descController.text.trim(),
+              category: _selectedCategory,
+              condition: _selectedCondition,
+              estimatedValue: 0.0,
+              city: _selectedCity,
+              photos: _uploadedPhotoUrls,
+              attributes: attrs,
+              wishes: _wishController.text.trim().isNotEmpty
+                  ? _wishController.text
+                      .split(',')
+                      .map((s) => s.trim())
+                      .where((s) => s.isNotEmpty)
+                      .toList()
+                  : ['Ouvert aux propositions'],
+            );
       if (success && mounted) {
         Get.offNamed('/my-listings', arguments: {
           'justPublished': true,
+          'isEdited': _isEditing,
           'city': _selectedCity,
           'title': _titleController.text.trim(),
         });
         Get.snackbar(
-          'Annonce publiée !',
-          'Votre annonce "${_titleController.text.trim()}" est maintenant visible à $_selectedCity.',
+          _isEditing ? 'Annonce modifiée !' : 'Annonce publiée !',
+          _isEditing
+              ? 'Vos modifications sur "${_titleController.text.trim()}" ont été enregistrées.'
+              : 'Votre annonce "${_titleController.text.trim()}" est maintenant visible à $_selectedCity.',
           backgroundColor: AppColors.success,
           colorText: Colors.white,
           duration: const Duration(seconds: 4),
@@ -271,7 +323,9 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
             child: SafeArea(
               top: false,
               child: PrimaryButton(
-                label: _step == _totalSteps ? 'Publier l\'annonce' : 'Continuer',
+                label: _step == _totalSteps
+                    ? (_isEditing ? 'Enregistrer les modifications' : 'Publier l\'annonce')
+                    : 'Continuer',
                 isLoading: _isPublishing,
                 onPressed: _isPublishing ? null : _nextStep,
               ),
@@ -310,17 +364,32 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
           spacing: 10,
           runSpacing: 10,
           children: [
-            ...List.generate(_previewBytes.length, (i) {
+            ...List.generate(_uploadedPhotoUrls.length, (i) {
+              final bytes = i < _previewBytes.length ? _previewBytes[i] : null;
               return Stack(
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.circular(10),
-                    child: Image.memory(
-                      _previewBytes[i],
-                      width: 98,
-                      height: 98,
-                      fit: BoxFit.cover,
-                    ),
+                    child: bytes != null
+                        ? Image.memory(
+                            bytes,
+                            width: 98,
+                            height: 98,
+                            fit: BoxFit.cover,
+                          )
+                        : Image.network(
+                            _uploadedPhotoUrls[i],
+                            width: 98,
+                            height: 98,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              width: 98,
+                              height: 98,
+                              color: AppColors.imagePlaceholder,
+                              child: const Icon(Icons.broken_image_outlined,
+                                  color: AppColors.textSecondary),
+                            ),
+                          ),
                   ),
                   if (i == 0)
                     Positioned(
@@ -603,17 +672,32 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
           style: AppTypography.sans(size: 13, color: AppColors.textSecondary),
         ),
         const SizedBox(height: 20),
-        if (_previewBytes.isNotEmpty) ...[
+        if (_uploadedPhotoUrls.isNotEmpty) ...[
           SizedBox(
             height: 84,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
-              itemCount: _previewBytes.length,
+              itemCount: _uploadedPhotoUrls.length,
               separatorBuilder: (_, __) => const SizedBox(width: 8),
-              itemBuilder: (_, i) => ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.memory(_previewBytes[i], width: 84, height: 84, fit: BoxFit.cover),
-              ),
+              itemBuilder: (_, i) {
+                final bytes = i < _previewBytes.length ? _previewBytes[i] : null;
+                return ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: bytes != null
+                      ? Image.memory(bytes, width: 84, height: 84, fit: BoxFit.cover)
+                      : Image.network(
+                          _uploadedPhotoUrls[i],
+                          width: 84,
+                          height: 84,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            width: 84,
+                            height: 84,
+                            color: AppColors.imagePlaceholder,
+                          ),
+                        ),
+                );
+              },
             ),
           ),
           const SizedBox(height: 18),
