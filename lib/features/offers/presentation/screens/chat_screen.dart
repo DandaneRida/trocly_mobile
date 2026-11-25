@@ -210,12 +210,20 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                     ),
                     if (soulte > 0)
-                      Text(
-                        '+ ${soulte.toStringAsFixed(0)} DH',
-                        style: AppTypography.sans(
-                          size: 12,
-                          weight: FontWeight.w600,
-                          color: AppColors.ink,
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 9, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.accentLight,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          'Soulte possible',
+                          style: AppTypography.sans(
+                            size: 11,
+                            weight: FontWeight.w700,
+                            color: AppColors.accent,
+                          ),
                         ),
                       ),
                   ],

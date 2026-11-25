@@ -184,6 +184,7 @@ void main() {
           'otherUser': {'id': 'user-2', 'displayName': 'Salma'},
           'lastMessage': 'Nouvelle proposition d\'échange',
           'status': 'pending',
+          'soulte': 1,
           'itemSummary': 'test2 ⇄ gtest',
         }),
       ];
@@ -204,6 +205,8 @@ void main() {
 
       expect(tester.takeException(), isNull);
       expect(find.text('PROPOSITION ENVOYÉE'), findsOneWidget);
+      expect(find.text('Soulte possible'), findsOneWidget);
+      expect(find.text('+ 1 DH'), findsNothing);
       expect(find.text('Accepter'), findsNothing);
       expect(find.text('Refuser'), findsNothing);
     });
