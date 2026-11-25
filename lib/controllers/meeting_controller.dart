@@ -20,6 +20,8 @@ class MeetingModel {
   final String? qrPayloadResponder;
   final DateTime? initiatorScannedAt;
   final DateTime? responderScannedAt;
+  final String? cancelReason;
+  final String? cancelledById;
 
   MeetingModel({
     required this.id,
@@ -36,9 +38,29 @@ class MeetingModel {
     this.qrPayloadResponder,
     this.initiatorScannedAt,
     this.responderScannedAt,
+    this.cancelReason,
+    this.cancelledById,
   });
 
   bool isInitiator(String uid) => initiatorId == uid;
+
+  String get statusLabel {
+    switch (status) {
+      case 'proposed':
+        return 'En attente';
+      case 'accepted':
+        return 'Confirmé';
+      case 'validated':
+      case 'completed':
+        return 'Validé';
+      case 'cancelled':
+        return 'Annulé';
+      case 'expired':
+        return 'Expiré';
+      default:
+        return status;
+    }
+  }
 
   String partnerName(String uid) =>
       isInitiator(uid) ? responderName : initiatorName;
@@ -79,6 +101,8 @@ class MeetingModel {
       responderScannedAt: json['responderScannedAt'] != null
           ? DateTime.tryParse(json['responderScannedAt'].toString())?.toLocal()
           : null,
+      cancelReason: json['cancelReason']?.toString(),
+      cancelledById: json['cancelledById']?.toString(),
     );
   }
 }
@@ -208,6 +232,42 @@ class MeetingController extends GetxController {
       }
     } catch (e) {
       Get.snackbar('Erreur réseau', e.toString());
+      return null;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  /// Cancel a proposed or accepted meeting and notify the partner
+  Future<MeetingModel?> cancelMeeting(String meetingId, {String? reason}) async {
+    isLoading.value = true;
+    errorMessage.value = '';
+    try {
+      final resp = await http.post(
+        Uri.parse('$_apiUrl/meetings/$meetingId/cancel'),
+        headers: _headers(),
+        body: jsonEncode({
+          if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
+        }),
+      );
+      if (resp.statusCode == 200 || resp.statusCode == 201) {
+        final meeting = MeetingModel.fromJson(jsonDecode(resp.body));
+        currentMeeting.value = meeting;
+        qrCodeData.value = '';
+        await fetchMyMeetings();
+        Get.snackbar(
+          'Rendez-vous annulé',
+          'Votre partenaire a reçu une notification d\'annulation.',
+        );
+        return meeting;
+      } else {
+        final err = jsonDecode(resp.body);
+        errorMessage.value = err['message']?.toString() ?? 'Annulation impossible';
+        Get.snackbar('Erreur', errorMessage.value);
+        return null;
+      }
+    } catch (e) {
+      Get.snackbar('Erreur réseau', 'Impossible d\'annuler le rendez-vous.');
       return null;
     } finally {
       isLoading.value = false;

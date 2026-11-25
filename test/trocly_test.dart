@@ -245,6 +245,29 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Accepter et générer les QR'), findsOneWidget);
+      expect(find.text('Annuler ce rendez-vous'), findsOneWidget);
+
+      // Case 3: Cancelled meeting (e.g. deleted listing) -> shows reason & hides QR/accept
+      meetings.currentMeeting.value = MeetingModel.fromJson({
+        'id': 'm-canc',
+        'offerId': 'o-1',
+        'initiator': {'id': 'user-proposer', 'displayName': 'Yassine'},
+        'responder': {'id': 'user-responder', 'displayName': 'Salma'},
+        'proposedLocation': 'Place El Hedim, Meknès',
+        'scheduledAt': '2026-11-25T15:00:00Z',
+        'expiresAt': '2026-11-25T17:00:00Z',
+        'status': 'cancelled',
+        'cancelReason': 'Annonce « Veste » supprimée par son propriétaire',
+      });
+      await tester.pumpWidget(const GetMaterialApp(home: QrScreen()));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Rendez-vous annulé'), findsOneWidget);
+      expect(
+        find.text('Annonce « Veste » supprimée par son propriétaire'),
+        findsOneWidget,
+      );
+      expect(find.text('Scanner son code'), findsNothing);
     });
 
     testWidgets('SplashScreen renders without bottom overflow on iPhone SE (375x667)',

@@ -49,6 +49,137 @@ class _QrScreenState extends State<QrScreen> {
     return 'TRC · ${clean.substring(0, 4)} · ${clean.substring(4, 8)}';
   }
 
+  void _showCancelDialog(MeetingModel meeting, String partnerName) {
+    final reasonCtrl = TextEditingController();
+    String selectedPreset = 'Empêchement imprévu';
+    final presets = [
+      'Empêchement imprévu',
+      'Autre créneau souhaité',
+      'Objet plus disponible',
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.paper,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            return SafeArea(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  20,
+                  14,
+                  20,
+                  MediaQuery.of(ctx).viewInsets.bottom + 20,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: AppColors.borderStrong,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Text('Annuler le rendez-vous ?',
+                        style: AppTypography.serif(size: 21)),
+                    const SizedBox(height: 6),
+                    Text(
+                      '$partnerName recevra immédiatement une notification avec le motif de l\'annulation.',
+                      style: AppTypography.sans(
+                          size: 13, color: AppColors.textSecondary, height: 1.45),
+                    ),
+                    const SizedBox(height: 16),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: presets.map((p) {
+                        final active = selectedPreset == p &&
+                            reasonCtrl.text.trim().isEmpty;
+                        return GestureDetector(
+                          onTap: () {
+                            setModalState(() {
+                              selectedPreset = p;
+                              reasonCtrl.clear();
+                            });
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 13, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: active ? AppColors.accent : AppColors.surface,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: active ? AppColors.accent : AppColors.line,
+                              ),
+                            ),
+                            child: Text(
+                              p,
+                              style: AppTypography.sans(
+                                size: 12.5,
+                                weight: FontWeight.w600,
+                                color: active ? Colors.white : AppColors.ink,
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: reasonCtrl,
+                      onChanged: (_) => setModalState(() {}),
+                      decoration: const InputDecoration(
+                        hintText: 'Autre motif (facultatif)…',
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: PrimaryButton(
+                            label: 'Garder',
+                            isOutlined: true,
+                            onPressed: () => Navigator.pop(ctx),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: PrimaryButton(
+                            label: 'Confirmer l\'annulation',
+                            backgroundColor: AppColors.error,
+                            onPressed: () async {
+                              final chosenReason =
+                                  reasonCtrl.text.trim().isNotEmpty
+                                      ? reasonCtrl.text.trim()
+                                      : selectedPreset;
+                              Navigator.pop(ctx);
+                              await _meetingController.cancelMeeting(
+                                meeting.id,
+                                reason: chosenReason,
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final uid = _authController.userId.value;
@@ -106,6 +237,9 @@ class _QrScreenState extends State<QrScreen> {
         final iScannedPartner = meeting.iScannedPartner(uid);
         final isValidated =
             meeting.status == 'validated' || meeting.status == 'completed';
+        final isCancelled = meeting.status == 'cancelled';
+        final canCancel =
+            meeting.status == 'proposed' || meeting.status == 'accepted';
 
         return Column(
           children: [
@@ -249,10 +383,57 @@ class _QrScreenState extends State<QrScreen> {
                             ),
                           ),
 
-                          // Bottom half: QR or pending acceptance
+                          // Bottom half: cancelled, pending acceptance, or QR
                           Padding(
                             padding: const EdgeInsets.fromLTRB(18, 12, 18, 22),
-                            child: meeting.status == 'proposed'
+                            child: isCancelled
+                                ? Column(
+                                    children: [
+                                      Container(
+                                        width: 58,
+                                        height: 58,
+                                        decoration: const BoxDecoration(
+                                          color: AppColors.errorLight,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(
+                                          Icons.event_busy_rounded,
+                                          size: 28,
+                                          color: AppColors.error,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Text(
+                                        'Rendez-vous annulé',
+                                        textAlign: TextAlign.center,
+                                        style: AppTypography.serif(
+                                          size: 20,
+                                          color: AppColors.error,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        (meeting.cancelReason != null &&
+                                                meeting.cancelReason!.isNotEmpty)
+                                            ? meeting.cancelReason!
+                                            : 'Ce rendez-vous a été annulé et les codes QR sont désactivés.',
+                                        textAlign: TextAlign.center,
+                                        style: AppTypography.sans(
+                                          size: 13,
+                                          color: AppColors.textSecondary,
+                                          height: 1.45,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 16),
+                                      PrimaryButton(
+                                        label: 'Retour aux messages',
+                                        isOutlined: true,
+                                        onPressed: () =>
+                                            Get.offAllNamed('/messages'),
+                                      ),
+                                    ],
+                                  )
+                                : meeting.status == 'proposed'
                                 ? (meeting.isInitiator(uid)
                                     ? Column(
                                         children: [
@@ -379,7 +560,7 @@ class _QrScreenState extends State<QrScreen> {
                     const SizedBox(height: 22),
 
                     // Double-scan checklist (D3)
-                    if (meeting.status != 'proposed') ...[
+                    if (meeting.status != 'proposed' && !isCancelled) ...[
                       _checkRow(
                         done: partnerScannedMe,
                         label: partnerScannedMe
@@ -394,13 +575,32 @@ class _QrScreenState extends State<QrScreen> {
                             : 'Scannez le code de $partnerName',
                       ),
                     ],
+
+                    if (canCancel) ...[
+                      const SizedBox(height: 18),
+                      Center(
+                        child: TextButton.icon(
+                          onPressed: () => _showCancelDialog(meeting, partnerName),
+                          icon: const Icon(Icons.cancel_outlined,
+                              size: 17, color: AppColors.error),
+                          label: Text(
+                            'Annuler ce rendez-vous',
+                            style: AppTypography.sans(
+                              size: 13,
+                              weight: FontWeight.w700,
+                              color: AppColors.error,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
             ),
 
             // Sticky bottom actions
-            if (meeting.status != 'proposed')
+            if (meeting.status != 'proposed' && !isCancelled)
               Container(
                 decoration: const BoxDecoration(
                   color: AppColors.paper,

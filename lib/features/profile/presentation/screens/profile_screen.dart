@@ -513,8 +513,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
     return Column(
       children: list.map((m) {
+        final isCancelled = m.status == 'cancelled';
+        final isExpired = m.status == 'expired';
+        final isAccepted = m.status == 'accepted';
+        final isValidated = m.status == 'validated' || m.status == 'completed';
+
+        final Color badgeBg = (isAccepted || isValidated)
+            ? AppColors.successLight
+            : isCancelled
+                ? AppColors.errorLight
+                : isExpired
+                    ? AppColors.bubble
+                    : AppColors.accentLight;
+        final Color badgeFg = (isAccepted || isValidated)
+            ? AppColors.success
+            : isCancelled
+                ? AppColors.error
+                : isExpired
+                    ? AppColors.textSecondary
+                    : AppColors.accent;
+
         return GestureDetector(
-          onTap: () => Get.toNamed('/my-qr/${m.id}'),
+          onTap: () async {
+            await Get.toNamed('/my-qr/${m.id}');
+            _meetings.fetchMyMeetings();
+          },
           child: Container(
             margin: const EdgeInsets.only(bottom: 10),
             padding: const EdgeInsets.all(14),
@@ -528,32 +551,75 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Container(
                   width: 42,
                   height: 42,
-                  decoration: const BoxDecoration(
-                    color: AppColors.accentLight,
+                  decoration: BoxDecoration(
+                    color: badgeBg,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.qr_code_2_rounded,
-                      size: 20, color: AppColors.accent),
+                  child: Icon(
+                    isCancelled
+                        ? Icons.event_busy_rounded
+                        : isValidated
+                            ? Icons.verified_rounded
+                            : Icons.qr_code_2_rounded,
+                    size: 20,
+                    color: badgeFg,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(m.proposedLocation,
-                          style: AppTypography.sans(
-                              size: 14, weight: FontWeight.w700)),
+                      Text(
+                        m.proposedLocation,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTypography.sans(
+                          size: 14,
+                          weight: FontWeight.w700,
+                          color: isCancelled ? AppColors.textSecondary : AppColors.ink,
+                        ),
+                      ),
                       const SizedBox(height: 3),
                       Text(
-                        '${m.scheduledAt.day}/${m.scheduledAt.month}/${m.scheduledAt.year} · ${m.status}',
+                        '${m.scheduledAt.day.toString().padLeft(2, '0')}/${m.scheduledAt.month.toString().padLeft(2, '0')}/${m.scheduledAt.year}',
                         style: AppTypography.sans(
                             size: 12, color: AppColors.textSecondary),
                       ),
+                      if (isCancelled &&
+                          m.cancelReason != null &&
+                          m.cancelReason!.isNotEmpty) ...[
+                        const SizedBox(height: 3),
+                        Text(
+                          m.cancelReason!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTypography.sans(
+                            size: 11.5,
+                            weight: FontWeight.w600,
+                            color: AppColors.error,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
-                const Icon(Icons.chevron_right_rounded,
-                    color: AppColors.textHint),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: badgeBg,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Text(
+                    m.statusLabel,
+                    style: AppTypography.sans(
+                      size: 11,
+                      weight: FontWeight.w700,
+                      color: badgeFg,
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
