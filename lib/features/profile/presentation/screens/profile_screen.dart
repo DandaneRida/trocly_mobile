@@ -288,11 +288,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
               if (Get.isRegistered<LocaleController>())
                 Obx(() {
                   final localeCtrl = Get.find<LocaleController>();
+                  final isAr = localeCtrl.isArabic.value;
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 10),
                     child: _menuCardTile(
                       icon: Icons.translate_rounded,
-                      title: 'Langue : ${'lang_switch'.tr}',
+                      title: isAr
+                          ? 'اللغة : Français (LTR)'
+                          : 'Langue : العربية (RTL)',
                       onTap: localeCtrl.toggleLanguage,
                     ),
                   );

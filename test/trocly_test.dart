@@ -6,6 +6,7 @@ import 'package:trocly_mobile/controllers/auth_controller.dart';
 import 'package:trocly_mobile/controllers/chat_controller.dart';
 import 'package:trocly_mobile/controllers/favorites_controller.dart';
 import 'package:trocly_mobile/controllers/listings_controller.dart';
+import 'package:trocly_mobile/controllers/reviews_controller.dart';
 import 'package:trocly_mobile/controllers/meeting_controller.dart';
 import 'package:trocly_mobile/controllers/offers_controller.dart';
 import 'package:trocly_mobile/core/i18n/app_translations.dart';
@@ -14,6 +15,7 @@ import 'package:trocly_mobile/core/widgets/state_page.dart';
 import 'package:trocly_mobile/features/feed/presentation/screens/listing_detail_screen.dart';
 import 'package:trocly_mobile/features/feed/presentation/screens/splash_screen.dart';
 import 'package:trocly_mobile/features/listings/presentation/screens/create_listing_screen.dart';
+import 'package:trocly_mobile/features/profile/presentation/screens/profile_screen.dart';
 import 'package:trocly_mobile/features/meeting/presentation/screens/qr_screen.dart';
 import 'package:trocly_mobile/features/offers/presentation/screens/chat_screen.dart';
 import 'package:trocly_mobile/features/offers/presentation/screens/messages_inbox_screen.dart';
@@ -391,6 +393,32 @@ void main() {
       expect(find.text('الرئيسية'), findsOneWidget);
       expect(Directionality.of(tester.element(find.text('الرئيسية'))),
           TextDirection.rtl);
+    });
+
+    testWidgets('ProfileScreen renders authenticated profile without GetX Obx error',
+        (WidgetTester tester) async {
+      final auth = Get.put(AuthController());
+      auth.authToken.value = 'test-jwt';
+      auth.userName.value = 'Lhassan Oubihi';
+      Get.put(ListingsController());
+      Get.put(ReviewsController());
+      Get.put(MeetingController());
+      Get.put(FavoritesController());
+      Get.put(LocaleController());
+
+      await tester.pumpWidget(GetMaterialApp(
+        translations: AppTranslations(),
+        locale: const Locale('fr', 'MA'),
+        home: const ProfileScreen(),
+      ));
+      await tester.pumpAndSettle();
+
+      // Scroll down to expose all bottom menu tiles (Favorites, Langue, Admin)
+      await tester.drag(find.byType(ListView), const Offset(0, -500));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('Langue : العربية (RTL)'), findsOneWidget);
     });
   });
 }
