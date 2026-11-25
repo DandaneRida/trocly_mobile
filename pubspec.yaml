@@ -21,8 +21,8 @@ dependencies:
   intl: ^0.19.0 # Date formatting
   connectivity_plus: ^6.0.5 # Check network
   image_picker: ^1.0.2 # Pick images from gallery/camera
-  firebase_core: ^2.24.0 # Firebase
-  firebase_messaging: ^14.6.0 # Push notifications
+  firebase_core: ^5.2.0 # Firebase
+  firebase_messaging: ^17.1.0 # Push notifications
   web_socket_channel: ^2.4.0 # WebSocket for real-time chat
   socket_io_client: ^3.0.2 # Socket.IO client matching NestJS gateway
   google_fonts: ^6.2.1 # Modern Plus Jakarta Sans typography

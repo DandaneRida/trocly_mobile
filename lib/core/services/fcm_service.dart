@@ -1,4 +1,3 @@
-import 'dart:io' show Platform;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
@@ -25,18 +24,19 @@ class FcmService {
         sound: true,
       );
 
+      final isIos = defaultTargetPlatform == TargetPlatform.iOS;
+      final platform = isIos ? 'ios' : 'android';
+
       final token = await messaging.getToken();
       if (token != null &&
           token.isNotEmpty &&
           Get.isRegistered<NotificationsController>()) {
-        final platform = Platform.isIOS ? 'ios' : 'android';
         await Get.find<NotificationsController>()
             .registerDeviceToken(token, platform: platform);
       }
 
       messaging.onTokenRefresh.listen((newToken) {
         if (Get.isRegistered<NotificationsController>()) {
-          final platform = Platform.isIOS ? 'ios' : 'android';
           Get.find<NotificationsController>()
               .registerDeviceToken(newToken, platform: platform);
         }
