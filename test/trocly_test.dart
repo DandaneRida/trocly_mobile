@@ -114,9 +114,10 @@ void main() {
       Get.toNamed('/detail', arguments: ownListing);
       await tester.pumpAndSettle();
 
-      expect(find.text('Modifier l\'annonce'), findsOneWidget);
+      expect(find.text('Modifier'), findsOneWidget);
       expect(find.text('Mes annonces'), findsOneWidget);
       expect(find.text('Proposer un troc'), findsNothing);
+      expect(find.text('Signaler cette annonce'), findsNothing);
     });
 
     testWidgets('ProposeOfferScreen shows Soulte possible switch and blocks self-listing',

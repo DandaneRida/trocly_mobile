@@ -22,10 +22,10 @@ class AppColors {
   static const Color accentDark       = Color(0xFFD96139);
   static const Color accentLight      = Color(0xFFFDECE5); // pêche tendre
 
-  // ── Texte ───────────────────────────────────────────────
+  // ── Texte (contraste renforcé pour une lecture nette) ────
   static const Color textPrimary      = ink;
-  static const Color textSecondary    = Color(0xFF776C67);
-  static const Color textHint         = Color(0xFFA69B95);
+  static const Color textSecondary    = Color(0xFF5A504B);
+  static const Color textHint         = Color(0xFF837872);
 
   // ── Filets & Bordures ───────────────────────────────────
   static const Color line             = Color(0xFFEDE1D9);

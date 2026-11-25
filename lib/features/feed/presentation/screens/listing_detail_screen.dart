@@ -421,23 +421,29 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
                   ),
                   const SizedBox(height: 14),
 
-                  Center(
-                    child: TextButton.icon(
-                      onPressed: () {
-                        Get.toNamed('/report', arguments: {
-                          'listingId': item.id,
-                          'userId': item.userId,
-                        });
-                      },
-                      icon: const Icon(Icons.flag_outlined,
-                          size: 15, color: AppColors.textHint),
-                      label: Text(
-                        'Signaler cette annonce',
-                        style: AppTypography.sans(
-                            size: 12.5, color: AppColors.textHint),
+                  Obx(() {
+                    final isOwner = _authController.userId.value.isNotEmpty &&
+                        item.userId.isNotEmpty &&
+                        item.userId == _authController.userId.value;
+                    if (isOwner) return const SizedBox.shrink();
+                    return Center(
+                      child: TextButton.icon(
+                        onPressed: () {
+                          Get.toNamed('/report', arguments: {
+                            'listingId': item.id,
+                            'userId': item.userId,
+                          });
+                        },
+                        icon: const Icon(Icons.flag_outlined,
+                            size: 15, color: AppColors.textHint),
+                        label: Text(
+                          'Signaler cette annonce',
+                          style: AppTypography.sans(
+                              size: 12.5, color: AppColors.textHint),
+                        ),
                       ),
-                    ),
-                  ),
+                    );
+                  }),
                 ],
               ),
             ),
@@ -457,8 +463,8 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
               if (isOwner) {
                 return Row(
                   children: [
-                    SizedBox(
-                      width: 132,
+                    Expanded(
+                      flex: 5,
                       child: PrimaryButton(
                         label: 'Mes annonces',
                         isOutlined: true,
@@ -467,8 +473,9 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
                     ),
                     const SizedBox(width: 10),
                     Expanded(
+                      flex: 6,
                       child: PrimaryButton(
-                        label: 'Modifier l\'annonce',
+                        label: 'Modifier',
                         icon: Icons.edit_outlined,
                         onPressed: () => Get.toNamed('/publish', arguments: item),
                       ),

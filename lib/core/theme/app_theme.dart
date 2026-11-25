@@ -24,7 +24,7 @@ class AppTypography {
   /// Corps d'interface moderne et lisible (Plus Jakarta Sans)
   static TextStyle sans({
     double size = 13.5,
-    FontWeight weight = FontWeight.w400,
+    FontWeight weight = FontWeight.w500,
     Color color = AppColors.ink,
     double? height,
     double? letterSpacing,
