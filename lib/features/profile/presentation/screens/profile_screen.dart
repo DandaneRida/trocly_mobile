@@ -89,7 +89,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       bottomNavigationBar: const TroclyBottomNav(currentIndex: 4),
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        title: const TroclyAppBarTitle(pageTitle: 'Profil'),
+        title: TroclyAppBarTitle(pageTitle: 'profile_title'.tr),
         actions: [
           Obx(() {
             if (_auth.authToken.value.isEmpty) return const SizedBox.shrink();
@@ -218,15 +218,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 child: Row(
                   children: [
-                    _statCell('$trustScore%', 'Confiance', highlight: true),
+                    _statCell('$trustScore%', 'trust_label'.tr, highlight: true),
                     Container(width: 1, height: 34, color: AppColors.line),
-                    _statCell('$exchanges', 'Échanges'),
+                    _statCell('$exchanges', 'exchanges_label'.tr),
                     Container(width: 1, height: 34, color: AppColors.line),
                     _statCell(
                       totalReviews > 0
                           ? avgRating.toStringAsFixed(1).replaceAll('.', ',')
                           : '—',
-                      '$totalReviews avis',
+                      '$totalReviews ${'reviews_label'.tr}',
                     ),
                   ],
                 ),
@@ -243,9 +243,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 child: Row(
                   children: [
-                    _pillTab(0, 'Annonces (${_listings.myListings.length})'),
-                    _pillTab(1, 'RDV (${_meetings.myMeetings.length})'),
-                    _pillTab(2, 'Avis ($totalReviews)'),
+                    _pillTab(0, '${'tab_listings'.tr} (${_listings.myListings.length})'),
+                    _pillTab(1, '${'tab_meetings'.tr} (${_meetings.myMeetings.length})'),
+                    _pillTab(2, '${'tab_reviews'.tr} ($totalReviews)'),
                   ],
                 ),
               ),
@@ -281,7 +281,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: 10),
               _menuCardTile(
                 icon: Icons.inventory_2_outlined,
-                title: 'Gérer toutes mes annonces',
+                title: 'manage_listings'.tr,
                 onTap: () => Get.toNamed('/my-listings'),
               ),
               const SizedBox(height: 10),
@@ -308,7 +308,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: 10),
               _menuCardTile(
                 icon: Icons.logout_rounded,
-                title: 'Se déconnecter',
+                title: 'logout'.tr,
                 iconColor: AppColors.error,
                 titleColor: AppColors.error,
                 onTap: _confirmLogout,

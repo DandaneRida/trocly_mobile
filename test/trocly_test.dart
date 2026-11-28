@@ -109,6 +109,8 @@ void main() {
       );
 
       await tester.pumpWidget(GetMaterialApp(
+        translations: AppTranslations(),
+        locale: const Locale('fr', 'MA'),
         home: const SizedBox.shrink(),
         getPages: [
           GetPage(
@@ -121,7 +123,7 @@ void main() {
       Get.toNamed('/detail', arguments: ownListing);
       await tester.pumpAndSettle();
 
-      expect(find.text('Modifier'), findsOneWidget);
+      expect(find.text('Modifier l\'annonce'), findsOneWidget);
       expect(find.text('Mes annonces'), findsOneWidget);
       expect(find.text('Proposer un troc'), findsNothing);
       expect(find.text('Signaler cette annonce'), findsNothing);
@@ -200,6 +202,8 @@ void main() {
       ];
 
       await tester.pumpWidget(GetMaterialApp(
+        translations: AppTranslations(),
+        locale: const Locale('fr', 'MA'),
         home: const MessagesInboxScreen(),
         getPages: [
           GetPage(name: '/chat/:offerId', page: () => const ChatScreen()),

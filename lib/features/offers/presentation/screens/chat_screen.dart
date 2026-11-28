@@ -25,6 +25,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   String? _offerId;
   ConversationModel? _conversation;
+  OfferModel? _offerDetails;
   String _offerStatus = 'pending';
   bool _isResponder = false;
   String _otherUserName = 'Conversation';
@@ -63,6 +64,7 @@ class _ChatScreenState extends State<ChatScreen> {
       final uid = _authController.userId.value;
       final responder = offer.responderId.isNotEmpty && offer.responderId == uid;
       setState(() {
+        _offerDetails = offer;
         _offerStatus = offer.status;
         _isResponder = responder;
         _soulte = offer.soulte ?? _soulte;
@@ -73,11 +75,266 @@ class _ChatScreenState extends State<ChatScreen> {
           if (offer.responderName.isNotEmpty) _otherUserName = offer.responderName;
           if (offer.responderId.isNotEmpty) _otherUserId = offer.responderId;
         }
-        if (_itemSummary.isEmpty && offer.items.isNotEmpty) {
-          _itemSummary = offer.items.map((e) => e.title).join(' contre ');
+        if (offer.items.isNotEmpty) {
+          _itemSummary = offer.items.map((e) => e.title).join(' ↔ ');
         }
       });
     }
+  }
+
+  String _formatCond(String raw) {
+    switch (raw) {
+      case 'neuf':
+        return 'Neuf';
+      case 'comme_neuf':
+        return 'Comme neuf';
+      case 'tres_bon':
+        return 'Très bon';
+      case 'bon':
+        return 'Bon état';
+      case 'use':
+        return 'Usé';
+      default:
+        return raw;
+    }
+  }
+
+  void _showOfferDetailsSheet() {
+    final offer = _offerDetails;
+    if (offer == null) {
+      _refreshOfferDetails();
+      return;
+    }
+    final initiatorItems = offer.items
+        .where((i) => i.ownerId.isEmpty || i.ownerId == offer.initiatorId)
+        .toList();
+    final responderItems = offer.items
+        .where((i) => i.ownerId.isNotEmpty && i.ownerId == offer.responderId)
+        .toList();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.paper,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: DraggableScrollableSheet(
+            expand: false,
+            initialChildSize: 0.72,
+            maxChildSize: 0.92,
+            minChildSize: 0.45,
+            builder: (_, scrollCtrl) {
+              return ListView(
+                controller: scrollCtrl,
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: AppColors.borderStrong,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'offer_details_title'.tr,
+                          style: AppTypography.serif(size: 21),
+                        ),
+                      ),
+                      if ((offer.soulte ?? 0) > 0)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: AppColors.accentLight,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Text(
+                            'soulte_possible'.tr,
+                            style: AppTypography.sans(
+                              size: 11.5,
+                              weight: FontWeight.w700,
+                              color: AppColors.accent,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'tap_to_inspect'.tr,
+                    style: AppTypography.sans(
+                        size: 12, color: AppColors.textSecondary),
+                  ),
+                  if (offer.message.trim().isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppColors.line),
+                      ),
+                      child: Text(
+                        '« ${offer.message.trim()} »',
+                        style: AppTypography.sans(
+                            size: 13, color: AppColors.ink, height: 1.4),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  Text(
+                    '${'offered_items'.tr} (${offer.initiatorName})',
+                    style: AppTypography.eyebrow(color: AppColors.accent),
+                  ),
+                  const SizedBox(height: 8),
+                  ...initiatorItems.map((it) => _offerItemPreviewCard(it, ctx)),
+                  if (responderItems.isNotEmpty) ...[
+                    const SizedBox(height: 14),
+                    Text(
+                      '${'target_items'.tr} (${offer.responderName})',
+                      style: AppTypography.eyebrow(color: AppColors.textSecondary),
+                    ),
+                    const SizedBox(height: 8),
+                    ...responderItems.map((it) => _offerItemPreviewCard(it, ctx)),
+                  ],
+                  if (_isResponder && _offerStatus == 'pending') ...[
+                    const SizedBox(height: 18),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _compactBtn(
+                            label: 'reject'.tr,
+                            borderColor: AppColors.line,
+                            fg: AppColors.textSecondary,
+                            onTap: () async {
+                              Navigator.pop(ctx);
+                              if (_offerId != null) {
+                                final ok = await _offersController
+                                    .rejectOffer(_offerId!);
+                                if (ok && mounted) {
+                                  setState(() => _offerStatus = 'rejected');
+                                }
+                              }
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _compactBtn(
+                            label: 'accept'.tr,
+                            bg: AppColors.accent,
+                            fg: Colors.white,
+                            onTap: () async {
+                              Navigator.pop(ctx);
+                              if (_offerId != null) {
+                                final ok = await _offersController
+                                    .acceptOffer(_offerId!);
+                                if (ok && mounted) {
+                                  setState(() => _offerStatus = 'accepted');
+                                }
+                              }
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _offerItemPreviewCard(OfferItemModel item, BuildContext modalCtx) {
+    final photo = item.photos.isNotEmpty ? item.photos.first : null;
+    return GestureDetector(
+      onTap: () {
+        Navigator.pop(modalCtx);
+        Get.toNamed('/listing/${item.id}', arguments: item.listingModel);
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: AppColors.cardShadow,
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                width: 68,
+                height: 68,
+                color: AppColors.imagePlaceholder,
+                child: photo != null && photo.isNotEmpty
+                    ? Image.network(
+                        photo,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const Icon(
+                          Icons.photo_outlined,
+                          color: AppColors.textSecondary,
+                        ),
+                      )
+                    : const Icon(
+                        Icons.inventory_2_outlined,
+                        color: AppColors.textSecondary,
+                      ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTypography.sans(
+                        size: 14, weight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${item.category} · ${_formatCond(item.condition)} · ${item.city}',
+                    style: AppTypography.sans(
+                        size: 11.5, color: AppColors.textSecondary),
+                  ),
+                  if (item.description.trim().isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      item.description.trim(),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.sans(
+                          size: 12, color: AppColors.textSecondary),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded,
+                size: 18, color: AppColors.textHint),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -292,7 +549,9 @@ class _ChatScreenState extends State<ChatScreen> {
                 children: [
                   Text(otherName, style: AppTypography.sans(size: 14.5, weight: FontWeight.w600)),
                   Obx(() => Text(
-                        _chatController.isConnected.value ? 'En ligne · temps réel' : 'Connexion…',
+                        _chatController.isConnected.value
+                            ? 'online_realtime'.tr
+                            : 'connecting'.tr,
                         style: AppTypography.sans(
                           size: 11,
                           color: _chatController.isConnected.value
@@ -345,16 +604,16 @@ class _ChatScreenState extends State<ChatScreen> {
                   children: [
                     Text(
                       status == 'accepted'
-                          ? 'OFFRE ACCEPTÉE'
+                          ? 'offer_accepted'.tr
                           : status == 'rejected'
-                              ? 'OFFRE REFUSÉE'
+                              ? 'offer_rejected'.tr
                               : status == 'cancelled'
-                                  ? 'OFFRE ANNULÉE'
+                                  ? 'offer_cancelled'.tr
                                   : status == 'countered'
-                                      ? 'CONTRE-PROPOSITION'
+                                      ? 'offer_countered'.tr
                                       : _isResponder
-                                          ? 'PROPOSITION REÇUE'
-                                          : 'PROPOSITION ENVOYÉE',
+                                          ? 'offer_received'.tr
+                                          : 'offer_sent'.tr,
                       style: AppTypography.eyebrow(
                         color: status == 'accepted'
                             ? AppColors.success
@@ -372,7 +631,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
-                          'Soulte possible',
+                          'soulte_possible'.tr,
                           style: AppTypography.sans(
                             size: 11,
                             weight: FontWeight.w700,
@@ -395,6 +654,40 @@ class _ChatScreenState extends State<ChatScreen> {
                   overflow: TextOverflow.ellipsis,
                   style: AppTypography.sans(size: 13.5, weight: FontWeight.w600),
                 ),
+                if (_offerDetails != null && _offerDetails!.items.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: _showOfferDetailsSheet,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 11, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: AppColors.paper,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.line),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.visibility_outlined,
+                              size: 15, color: AppColors.accent),
+                          const SizedBox(width: 7),
+                          Expanded(
+                            child: Text(
+                              '${'view_offer_details'.tr} (${_offerDetails!.items.length})',
+                              style: AppTypography.sans(
+                                size: 12,
+                                weight: FontWeight.w700,
+                                color: AppColors.ink,
+                              ),
+                            ),
+                          ),
+                          const Icon(Icons.chevron_right_rounded,
+                              size: 16, color: AppColors.textSecondary),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 11),
                 if (status == 'accepted')
                   SizedBox(
@@ -409,7 +702,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         });
                       },
                       icon: const Icon(Icons.calendar_today_outlined, size: 15),
-                      label: const Text('Planifier le rendez-vous QR'),
+                      label: Text('plan_qr_meeting'.tr),
                     ),
                   )
                 else if (status == 'rejected' || status == 'cancelled')
@@ -445,7 +738,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     children: [
                       Expanded(
                         child: _compactBtn(
-                          label: 'Refuser',
+                          label: 'reject'.tr,
                           borderColor: AppColors.line,
                           fg: AppColors.textSecondary,
                           onTap: () async {
@@ -461,7 +754,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: _compactBtn(
-                          label: 'Contre-offre',
+                          label: 'counter_offer'.tr,
                           borderColor: AppColors.accent,
                           fg: AppColors.accent,
                           onTap: _showCounterOfferSheet,
@@ -470,7 +763,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: _compactBtn(
-                          label: 'Accepter',
+                          label: 'accept'.tr,
                           bg: AppColors.accent,
                           fg: Colors.white,
                           onTap: () async {

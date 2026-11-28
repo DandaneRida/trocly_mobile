@@ -2,28 +2,70 @@ import 'dart:convert';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'auth_controller.dart';
+import 'listings_controller.dart';
 import '../core/constants/api_constants.dart';
 
 class OfferItemModel {
   final String id;
   final String title;
+  final String description;
   final String category;
+  final String condition;
+  final String city;
+  final List<String> photos;
+  final String ownerId;
+  final String ownerName;
   final double estimatedValue;
+  final ListingModel? listingModel;
 
   OfferItemModel({
     required this.id,
     required this.title,
+    this.description = '',
     required this.category,
+    this.condition = 'bon',
+    this.city = 'Meknès',
+    this.photos = const [],
+    this.ownerId = '',
+    this.ownerName = '',
     required this.estimatedValue,
+    this.listingModel,
   });
 
   factory OfferItemModel.fromJson(Map<String, dynamic> json) {
+    final cityObj = json['city'];
+    final cityName = cityObj is Map
+        ? (cityObj['name']?.toString() ?? 'Meknès')
+        : (cityObj?.toString() ?? 'Meknès');
+    final userObj = json['user'];
+    final ownerId = userObj is Map
+        ? (userObj['id']?.toString() ?? '')
+        : (json['userId']?.toString() ?? '');
+    final ownerName = userObj is Map
+        ? (userObj['displayName']?.toString() ?? '')
+        : '';
+    final rawPhotos = json['photos'] is List
+        ? List<String>.from((json['photos'] as List).map((e) => e.toString()))
+        : <String>[];
+
+    ListingModel? fullModel;
+    try {
+      fullModel = ListingModel.fromJson(json);
+    } catch (_) {}
+
     return OfferItemModel(
       id: json['id']?.toString() ?? '',
       title: json['title'] ?? '',
+      description: json['description'] ?? '',
       category: json['category'] ?? '',
+      condition: json['condition'] ?? 'bon',
+      city: cityName,
+      photos: rawPhotos,
+      ownerId: ownerId,
+      ownerName: ownerName,
       estimatedValue:
           double.tryParse(json['estimatedValue']?.toString() ?? '0') ?? 0.0,
+      listingModel: fullModel,
     );
   }
 }

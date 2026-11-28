@@ -35,6 +35,27 @@ class _FeedScreenState extends State<FeedScreen> {
     'Bricolage',
   ];
 
+  String _translateCategory(String cat) {
+    switch (cat) {
+      case 'Tout':
+        return 'cat_all'.tr;
+      case 'Vêtements':
+        return 'cat_vetements'.tr;
+      case 'Électronique':
+        return 'cat_electronique'.tr;
+      case 'Maison':
+        return 'cat_maison'.tr;
+      case 'Sport':
+        return 'cat_sport'.tr;
+      case 'Livres':
+        return 'cat_livres'.tr;
+      case 'Bricolage':
+        return 'cat_bricolage'.tr;
+      default:
+        return cat;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -464,7 +485,7 @@ class _FeedScreenState extends State<FeedScreen> {
                                 : AppColors.pillShadow,
                           ),
                           child: Text(
-                            _categories[index],
+                            _translateCategory(_categories[index]),
                             style: AppTypography.sans(
                               size: 13,
                               weight: isSelected ? FontWeight.w700 : FontWeight.w500,

@@ -332,7 +332,7 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'RECHERCHE EN ÉCHANGE',
+                                'wishes_label'.tr,
                                 style: AppTypography.eyebrow(
                                     color: AppColors.accent),
                               ),
@@ -468,7 +468,7 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
                         icon: const Icon(Icons.flag_outlined,
                             size: 15, color: AppColors.textHint),
                         label: Text(
-                          'Signaler cette annonce',
+                          'report_listing'.tr,
                           style: AppTypography.sans(
                               size: 12.5, color: AppColors.textHint),
                         ),
@@ -497,7 +497,7 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
                     Expanded(
                       flex: 5,
                       child: PrimaryButton(
-                        label: 'Mes annonces',
+                        label: 'my_listings'.tr,
                         isOutlined: true,
                         onPressed: () => Get.toNamed('/my-listings'),
                       ),
@@ -506,7 +506,7 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
                     Expanded(
                       flex: 6,
                       child: PrimaryButton(
-                        label: 'Modifier',
+                        label: 'edit_listing'.tr,
                         icon: Icons.edit_outlined,
                         onPressed: () => Get.toNamed('/publish', arguments: item),
                       ),
@@ -519,7 +519,7 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
                   SizedBox(
                     width: 118,
                     child: PrimaryButton(
-                      label: 'Message',
+                      label: 'nav_messages'.tr,
                       isOutlined: true,
                       onPressed: _onProposeTroc,
                     ),
@@ -527,7 +527,7 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: PrimaryButton(
-                      label: 'Proposer un troc',
+                      label: 'propose_swap'.tr,
                       icon: Icons.swap_horiz_rounded,
                       onPressed: _onProposeTroc,
                     ),

@@ -23,13 +23,12 @@ class _ReportScreenState extends State<ReportScreen> {
   String _selectedReason = 'fraud';
   bool _isSubmitting = false;
 
-  final Map<String, String> _reasons = const {
-    'fraud': 'Suspicion de fraude ou arnaque',
-    'fake_listing': 'Annonce trompeuse ou inexacte',
-    'inappropriate_content': 'Contenu inapproprié ou interdit',
-    'harassment': 'Comportement abusif ou harcèlement',
-    'no_show': 'Absence au rendez-vous convenu',
-    'other': 'Autre raison',
+  final Map<String, String> _reasonKeys = const {
+    'fraud': 'report_reason_fraud',
+    'spam': 'report_reason_spam',
+    'inappropriate_images': 'report_reason_images',
+    'abusive_content': 'report_reason_abusive',
+    'other': 'report_reason_other',
   };
 
   @override
@@ -63,13 +62,13 @@ class _ReportScreenState extends State<ReportScreen> {
       );
       if (resp.statusCode == 200 || resp.statusCode == 201) {
         Get.back();
-        Get.snackbar('Signalement envoyé', 'Merci, l\'équipe de modération va l\'examiner.');
+        Get.snackbar('report_sent_title'.tr, 'report_sent_body'.tr);
       } else {
         final err = jsonDecode(resp.body);
-        Get.snackbar('Erreur', err['message']?.toString() ?? 'Impossible d\'envoyer le signalement');
+        Get.snackbar('error'.tr, err['message']?.toString() ?? 'Impossible d\'envoyer le signalement');
       }
     } catch (e) {
-      Get.snackbar('Erreur réseau', 'Impossible de contacter le serveur.');
+      Get.snackbar('error'.tr, 'Impossible de contacter le serveur.');
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -85,7 +84,7 @@ class _ReportScreenState extends State<ReportScreen> {
           icon: const Icon(Icons.close_rounded),
           onPressed: () => Get.back(),
         ),
-        title: const TroclyAppBarTitle(pageTitle: 'Signaler'),
+        title: TroclyAppBarTitle(pageTitle: 'report_title'.tr),
         bottom: const PreferredSize(
           preferredSize: Size.fromHeight(1),
           child: Divider(height: 1),
@@ -99,10 +98,10 @@ class _ReportScreenState extends State<ReportScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Quel est le problème ?', style: AppTypography.serif(size: 25)),
+                  Text('report_heading'.tr, style: AppTypography.serif(size: 25)),
                   const SizedBox(height: 6),
                   Text(
-                    'Votre signalement est confidentiel et examiné par la modération.',
+                    'report_confidential'.tr,
                     style: AppTypography.sans(size: 13, color: AppColors.textSecondary),
                   ),
                   const SizedBox(height: 20),
@@ -113,9 +112,9 @@ class _ReportScreenState extends State<ReportScreen> {
                       border: Border.all(color: AppColors.line),
                     ),
                     child: Column(
-                      children: _reasons.entries.map((entry) {
+                      children: _reasonKeys.entries.map((entry) {
                         final selected = entry.key == _selectedReason;
-                        final isLast = entry.key == _reasons.keys.last;
+                        final isLast = entry.key == _reasonKeys.keys.last;
                         return Column(
                           children: [
                             InkWell(
@@ -138,7 +137,7 @@ class _ReportScreenState extends State<ReportScreen> {
                                     const SizedBox(width: 12),
                                     Expanded(
                                       child: Text(
-                                        entry.value,
+                                        entry.value.tr,
                                         style: AppTypography.sans(
                                           size: 13.5,
                                           weight: selected ? FontWeight.w600 : FontWeight.w400,
@@ -157,7 +156,7 @@ class _ReportScreenState extends State<ReportScreen> {
                   ),
                   const SizedBox(height: 20),
                   Text(
-                    'Précisions (facultatif)',
+                    'report_details_label'.tr,
                     style: AppTypography.sans(
                       size: 12.5,
                       weight: FontWeight.w500,
@@ -168,8 +167,8 @@ class _ReportScreenState extends State<ReportScreen> {
                   TextField(
                     controller: _detailsController,
                     maxLines: 3,
-                    decoration: const InputDecoration(
-                      hintText: 'Décrivez brièvement la situation…',
+                    decoration: InputDecoration(
+                      hintText: 'report_details_hint'.tr,
                     ),
                   ),
                 ],
@@ -185,7 +184,7 @@ class _ReportScreenState extends State<ReportScreen> {
             child: SafeArea(
               top: false,
               child: PrimaryButton(
-                label: 'Envoyer le signalement',
+                label: 'report_submit'.tr,
                 isLoading: _isSubmitting,
                 onPressed: _submit,
               ),
